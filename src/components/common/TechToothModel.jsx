@@ -3,10 +3,10 @@ import React from 'react';
 // --- 3D模型组件(使用CSS 3D模拟科技感) ---
 const TechToothModel = () => {
     return (
-        <div className="w-full h-64 flex items-center justify-center perspective-1000 overflow-hidden relative">
+        <div className="w-full h-full flex items-center justify-center perspective-1000 overflow-hidden relative">
             <div className="absolute inset-0 bg-blue-500/5 blur-3xl rounded-full animate-pulse"></div>
             {/* CSS 3D Rotating Cube representing a stylized tech tooth */}
-            <div className="relative w-32 h-32 transform-style-3d animate-spin-slow">
+            <div className="relative w-64 h-64 md:w-96 md:h-96 transform-style-3d animate-spin-slow">
                 <div className="absolute inset-0 border-2 border-cyan-400/50 bg-cyan-500/10 backdrop-blur-sm transform translate-z-16 flex items-center justify-center text-cyan-200 shadow-[0_0_15px_rgba(34,211,238,0.5)]">TOP</div>
                 <div className="absolute inset-0 border-2 border-cyan-400/50 bg-cyan-500/10 backdrop-blur-sm transform -translate-z-16 flex items-center justify-center text-cyan-200">BOTTOM</div>
                 <div className="absolute inset-0 border-2 border-cyan-400/50 bg-cyan-500/10 backdrop-blur-sm transform rotate-y-90 translate-z-16 flex items-center justify-center text-cyan-200">RIGHT</div>
@@ -14,7 +14,7 @@ const TechToothModel = () => {
                 <div className="absolute inset-0 border-2 border-cyan-400/50 bg-cyan-500/10 backdrop-blur-sm transform rotate-x-90 translate-z-16 flex items-center justify-center text-cyan-200">FRONT</div>
                 <div className="absolute inset-0 border-2 border-cyan-400/50 bg-cyan-500/10 backdrop-blur-sm transform rotate-x-90 -translate-z-16 flex items-center justify-center text-cyan-200">BACK</div>
                 {/* Core Glow */}
-                <div className="absolute inset-8 bg-white/30 blur-md rounded-full transform-style-3d animate-pulse"></div>
+                <div className="absolute inset-10 bg-white/30 blur-md rounded-full transform-style-3d animate-pulse"></div>
             </div>
             <div className="absolute bottom-4 text-cyan-600 text-xs font-mono tracking-widest">INTERACTIVE 3D VIEW</div>
             <style>{`

@@ -8,6 +8,9 @@ const BottomNav = ({ currentPage, navigateTo }) => {
             <button onClick={() => navigateTo('home')} className={`flex flex-col items-center gap-1 ${currentPage === 'home' ? 'text-cyan-600' : 'text-slate-400'}`}>
                 <div className="p-1"><Activity size={20} /></div>
             </button>
+            <button onClick={() => navigateTo('model3d')} className={`flex flex-col items-center gap-1 ${currentPage === 'model3d' ? 'text-cyan-600' : 'text-slate-400'}`}>
+                <div className="p-1"><User size={20} /></div>
+            </button>
             <button onClick={() => navigateTo('doctors')} className={`flex flex-col items-center gap-1 ${currentPage === 'doctors' ? 'text-cyan-600' : 'text-slate-400'}`}>
                 <div className="p-1"><User size={20} /></div>
             </button>
