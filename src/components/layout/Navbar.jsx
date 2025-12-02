@@ -23,20 +23,48 @@ const Navbar = ({ currentPage, navigateTo }) => {
                     <span className="font-bold text-lg tracking-tight text-slate-800">未来诊所</span>
                 </div>
 
-                <div className="hidden md:flex gap-6 text-sm font-medium text-slate-500">
-                    {['home', 'model3d', 'hospitals', 'doctors', 'consultation', 'appointment', 'records', 'aiInquiry'].map(page => (
-                        <button
-                            key={page}
-                            onClick={() => navigateTo(page)}
-                            className={`hover:text-cyan-600 transition ${currentPage === page ? 'text-cyan-600 font-bold' : ''}`}
-                        >
-                            {pageLabels[page]}
-                        </button>
-                    ))}
+                <div className="flex-1 flex items-center justify-center">
+                    <div className="hidden md:flex gap-6 text-sm font-medium text-slate-500 items-center">
+                        {['home', 'model3d', 'hospitals', 'doctors', 'consultation', 'appointment', 'records', 'aiInquiry'].map(page => (
+                            <button
+                                key={page}
+                                onClick={() => navigateTo(page)}
+                                className={`hover:text-cyan-600 transition ${currentPage === page ? 'text-cyan-600 font-bold' : ''}`}
+                            >
+                                {pageLabels[page]}
+                            </button>
+                        ))}
+                    </div>
                 </div>
 
-                <div className="w-8 h-8 rounded-full bg-slate-200 overflow-hidden border border-slate-300">
-                    <img src="https://i.pravatar.cc/150?u=user" alt="User" />
+                <div className="flex items-center gap-4">
+                    <div className="hidden md:flex items-center gap-3">
+                        <button
+                            onClick={() => navigateTo('login')}
+                            className="text-sm px-3 py-1 rounded hover:bg-slate-100 transition"
+                        >
+                            登录
+                        </button>
+
+                        <button
+                            onClick={() => navigateTo('register')}
+                            className="text-sm px-3 py-1 rounded bg-cyan-600 text-white hover:bg-cyan-700 transition"
+                        >
+                            注册
+                        </button>
+
+                        <button
+                            onClick={() => { localStorage.setItem('guest', 'true'); navigateTo('home'); }}
+                            className="text-sm px-2 py-1 rounded border border-slate-200 hover:bg-slate-50 transition"
+                            title="以游客身份访问"
+                        >
+                            游客
+                        </button>
+                    </div>
+
+                    <div className="w-8 h-8 rounded-full bg-slate-200 overflow-hidden border border-slate-300">
+                        <img src="https://i.pravatar.cc/150?u=user" alt="User" />
+                    </div>
                 </div>
             </div>
         </nav>
