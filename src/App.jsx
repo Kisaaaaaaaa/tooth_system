@@ -10,6 +10,8 @@ import AppointmentsPage from './components/pages/AppointmentsPage';
 import RecordsPage from './components/pages/RecordsPage';
 import AiInquiryPage from './components/pages/AiInquiryPage';
 import ThreeDModelPage from './components/pages/ThreeDModelPage';
+import Login from './components/Auth/Login';
+import Register from './components/Auth/Register';
 import './styles/global.css';
 
 // --- 主应用组件 ---
@@ -42,6 +44,14 @@ const DentalApp = () => {
                 <div className="w-full px-0 md:px-0">
                     <ThreeDModelPage navigateTo={navigateTo} />
                 </div>
+            ) : currentPage === 'login' ? (
+                <main className="max-w-7xl mx-auto p-4 md:p-6">
+                    <Login navigateTo={navigateTo} />
+                </main>
+            ) : currentPage === 'register' ? (
+                <main className="max-w-7xl mx-auto p-4 md:p-6">
+                    <Register navigateTo={navigateTo} />
+                </main>
             ) : (
                 <main className="max-w-7xl mx-auto p-4 md:p-6">
                     {currentPage === 'hospitals' && <HospitalsPage />}
