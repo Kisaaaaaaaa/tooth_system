@@ -8,6 +8,8 @@ import DoctorsPage from './components/pages/DoctorsPage';
 import ConsultationPage from './components/pages/ConsultationPage';
 import AppointmentsPage from './components/pages/AppointmentsPage';
 import RecordsPage from './components/pages/RecordsPage';
+import AiInquiryPage from './components/pages/AiInquiryPage';
+import ThreeDModelPage from './components/pages/ThreeDModelPage';
 import './styles/global.css';
 
 // --- 主应用组件 ---
@@ -18,7 +20,7 @@ const DentalApp = () => {
     // Router Logic
     const navigateTo = (page, params = {}) => {
         setCurrentPage(page);
-        window.scrollTo({top: 0, behavior: 'smooth'});
+        window.scrollTo({ top: 0, behavior: 'smooth' });
     };
 
     const startConsultation = (doctor) => {
@@ -31,21 +33,22 @@ const DentalApp = () => {
             {/* 顶部导航 */}
             <Navbar currentPage={currentPage} navigateTo={navigateTo} />
 
-            {/* 内容区域 */}
-            <main className="max-w-3xl mx-auto p-4 md:p-6">
-                {currentPage !== 'home' && (
-                    <button onClick={() => navigateTo('home')} className="mb-4 text-slate-400 hover:text-slate-600 flex items-center gap-1 text-sm">
-                        <ArrowLeft size={16} /> 返回首页
-                    </button>
-                )}
-
-                {currentPage === 'home' && <HomePage navigateTo={navigateTo} />}
-                {currentPage === 'hospitals' && <HospitalsPage />}
-                {currentPage === 'doctors' && <DoctorsPage navigateTo={navigateTo} startConsultation={startConsultation} />}
-                {currentPage === 'consultation' && <ConsultationPage currentDoctor={selectedDoctor} />}
-                {currentPage === 'appointment' && <AppointmentsPage />}
-                {currentPage === 'records' && <RecordsPage />}
-            </main>
+            {/* 内容区域：首页采用全宽展示，其他页面使用居中容器 */}
+            {currentPage === 'home' ? (
+                <div className="w-full px-0 md:px-0">
+                    <HomePage navigateTo={navigateTo} />
+                </div>
+            ) : (
+                <main className="max-w-7xl mx-auto p-4 md:p-6">
+                    {currentPage === 'hospitals' && <HospitalsPage />}
+                    {currentPage === 'doctors' && <DoctorsPage navigateTo={navigateTo} startConsultation={startConsultation} />}
+                    {currentPage === 'consultation' && <ConsultationPage currentDoctor={selectedDoctor} />}
+                    {currentPage === 'appointment' && <AppointmentsPage />}
+                    {currentPage === 'records' && <RecordsPage />}
+                    {currentPage === 'aiInquiry' && <AiInquiryPage />}
+                    {currentPage === 'model3d' && <ThreeDModelPage navigateTo={navigateTo} />}
+                </main>
+            )}
 
             {/* 移动端底部导航 */}
             <BottomNav currentPage={currentPage} navigateTo={navigateTo} />

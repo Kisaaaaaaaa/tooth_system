@@ -4,16 +4,18 @@ import React from 'react';
 const Navbar = ({ currentPage, navigateTo }) => {
     const pageLabels = {
         'home': '首页',
+        'model3d': '3D模型',
         'hospitals': '医院',
         'doctors': '医生',
         'consultation': '问诊',
         'appointment': '预约',
-        'records': '病历'
+        'records': '病历',
+        'aiInquiry': 'AI问询'
     };
 
     return (
         <nav className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-slate-200 shadow-sm">
-            <div className="max-w-3xl mx-auto px-4 h-16 flex items-center justify-between">
+            <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
                 <div className="flex items-center gap-2 cursor-pointer" onClick={() => navigateTo('home')}>
                     <div className="w-8 h-8 bg-gradient-to-tr from-cyan-500 to-blue-600 rounded-lg flex items-center justify-center text-white font-bold shadow-lg shadow-cyan-500/30">
                         D
@@ -22,7 +24,7 @@ const Navbar = ({ currentPage, navigateTo }) => {
                 </div>
 
                 <div className="hidden md:flex gap-6 text-sm font-medium text-slate-500">
-                    {['home', 'hospitals', 'doctors', 'consultation', 'appointment', 'records'].map(page => (
+                    {['home', 'model3d', 'hospitals', 'doctors', 'consultation', 'appointment', 'records', 'aiInquiry'].map(page => (
                         <button
                             key={page}
                             onClick={() => navigateTo(page)}
