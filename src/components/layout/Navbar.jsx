@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import api from '../../api/auth';
 
 // 顶部导航栏组件
 const Navbar = ({ currentPage, navigateTo }) => {
@@ -11,6 +12,39 @@ const Navbar = ({ currentPage, navigateTo }) => {
         'appointment': '预约',
         'records': '病历',
         'aiInquiry': 'AI问询'
+    };
+
+    const [user, setUser] = useState(null);
+
+    useEffect(() => {
+        const raw = localStorage.getItem('user');
+        if (raw) {
+            try { setUser(JSON.parse(raw)); } catch { setUser(null); }
+        }
+
+        const onStorage = (e) => {
+            if (e.key === 'user' || e.key === 'authToken') {
+                const r = localStorage.getItem('user');
+                if (r) { try { setUser(JSON.parse(r)); } catch { setUser(null); } }
+                else setUser(null);
+            }
+        };
+        window.addEventListener('storage', onStorage);
+        return () => window.removeEventListener('storage', onStorage);
+    }, []);
+
+    const handleLogout = async () => {
+        try {
+            await api.logout();
+        } catch (e) {
+            // ignore server error, still clear client state
+        }
+        localStorage.removeItem('authToken');
+        localStorage.removeItem('user');
+        localStorage.removeItem('pendingRegistration');
+        localStorage.removeItem('guest');
+        setUser(null);
+        navigateTo('home');
     };
 
     return (
@@ -39,27 +73,28 @@ const Navbar = ({ currentPage, navigateTo }) => {
 
                 <div className="flex items-center gap-4">
                     <div className="hidden md:flex items-center gap-3">
-                        <button
-                            onClick={() => navigateTo('login')}
-                            className="text-sm px-3 py-1 rounded hover:bg-slate-100 transition"
-                        >
-                            登录
-                        </button>
+                        {user ? (
+                            <>
+                                <span className="text-sm text-slate-700">{user.name || user.phone || '已登录'}</span>
+                                <button onClick={handleLogout} className="text-sm px-3 py-1 rounded border border-slate-200 hover:bg-slate-50 transition">登出</button>
+                            </>
+                        ) : (
+                            <>
+                                <button
+                                    onClick={() => navigateTo('login')}
+                                    className="text-sm px-3 py-1 rounded hover:bg-slate-100 transition"
+                                >
+                                    登录
+                                </button>
 
-                        <button
-                            onClick={() => navigateTo('register')}
-                            className="text-sm px-3 py-1 rounded bg-cyan-600 text-white hover:bg-cyan-700 transition"
-                        >
-                            注册
-                        </button>
-
-                        <button
-                            onClick={() => { localStorage.setItem('guest', 'true'); navigateTo('home'); }}
-                            className="text-sm px-2 py-1 rounded border border-slate-200 hover:bg-slate-50 transition"
-                            title="以游客身份访问"
-                        >
-                            游客
-                        </button>
+                                <button
+                                    onClick={() => navigateTo('register')}
+                                    className="text-sm px-3 py-1 rounded bg-cyan-600 text-white hover:bg-cyan-700 transition"
+                                >
+                                    注册
+                                </button>
+                            </>
+                        )}
                     </div>
 
                     <div className="w-8 h-8 rounded-full bg-slate-200 overflow-hidden border border-slate-300">
