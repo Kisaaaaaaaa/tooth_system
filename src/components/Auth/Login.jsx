@@ -1,6 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-// 如果需要对接后端，请在 `src/api/auth.js` 中实现并导入 login 方法
-// import { login as apiLogin } from '../../api/auth';
+import api from '../../api/auth';
 
 const generateCaptcha = (length = 5) => {
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // 去掉易混淆字符
@@ -17,14 +16,73 @@ const Login = ({ navigateTo }) => {
     const [error, setError] = useState('');
 
     useEffect(() => {
-        setCaptcha(generateCaptcha(5));
+        // try fetch server captcha; fallback to local generated captcha
+        let mounted = true;
+        api.getCaptcha().then(r => {
+            if (!mounted) return;
+            // server may return { id, image } or raw text
+            if (r && (r.image || r.raw || r.captcha)) {
+                // if image provided, display image; if raw text, treat as captcha string
+                if (r.image) {
+                    setCaptcha(r.image);
+                    setCaptchaId(r.id || r.captcha_id || null);
+                    setUseServerCaptcha(true);
+                } else if (r.raw) {
+                    // if it's base64 data without data: prefix, add prefix
+                    if (/^[A-Za-z0-9+/=]+$/.test(r.raw)) {
+                        setCaptcha('data:image/png;base64,' + r.raw);
+                        setUseServerCaptcha(true);
+                        setCaptchaId(null);
+                    } else {
+                        setCaptcha(r.raw);
+                        setUseServerCaptcha(false);
+                    }
+                } else {
+                    setCaptcha(String(r));
+                }
+            } else {
+                setCaptcha(generateCaptcha(5));
+            }
+        }).catch(() => {
+            setCaptcha(generateCaptcha(5));
+        });
+        return () => { mounted = false; };
     }, []);
 
-    const refreshCaptcha = () => setCaptcha(generateCaptcha(5));
+    const [captchaId, setCaptchaId] = useState(null);
+    const [useServerCaptcha, setUseServerCaptcha] = useState(false);
+
+    const refreshCaptcha = async () => {
+        try {
+            const r = await api.getCaptcha();
+            if (r && r.image) {
+                setCaptcha(r.image);
+                setUseServerCaptcha(true);
+                setCaptchaId(r.id || r.captcha_id || null);
+            } else if (r && r.raw) {
+                if (/^[A-Za-z0-9+/=]+$/.test(r.raw)) {
+                    setCaptcha('data:image/png;base64,' + r.raw);
+                    setUseServerCaptcha(true);
+                    setCaptchaId(null);
+                } else {
+                    setCaptcha(r.raw);
+                    setUseServerCaptcha(false);
+                }
+            } else {
+                setCaptcha(generateCaptcha(5));
+                setUseServerCaptcha(false);
+            }
+        } catch (err) {
+            setCaptcha(generateCaptcha(5));
+            setUseServerCaptcha(false);
+        }
+    };
 
     const canvasRef = useRef(null);
 
     const drawCaptchaCanvas = () => {
+        // don't draw local canvas when server captcha image is used
+        if (useServerCaptcha || (typeof captcha === 'string' && captcha.startsWith('data:image/'))) return;
         const canvas = canvasRef.current;
         if (!canvas) return;
         const ctx = canvas.getContext('2d');
@@ -102,7 +160,7 @@ const Login = ({ navigateTo }) => {
         setError('');
 
         if (!validatePhone(phone)) {
-            setError('请输入有效的电话号码（仅数字，7-15位）');
+            setError('请输入有效的电话号码（仅数字，11位）');
             return;
         }
 
@@ -113,19 +171,32 @@ const Login = ({ navigateTo }) => {
             return;
         }
 
-        // 前端示例：保存用户并视为已登录（实际请调用后端 API）
-        const user = { phone };
-        localStorage.setItem('user', JSON.stringify(user));
-        localStorage.removeItem('guest');
-        navigateTo('home');
-
-        // 如果对接后端，示例：
-        // try {
-        //   const res = await apiLogin({ phone, password });
-        //   // 处理后端返回（token、user 等）
-        // } catch (err) {
-        //   setError(err.message || '登录失败');
-        // }
+        // 调用后端登录接口
+        try {
+            const payload = { phone, password, captcha_id: captchaId, captcha: captchaInput };
+            const res = await api.login(payload);
+            // 假定后端返回 { token, user } 或 token 字符串
+            if (res && res.token) {
+                localStorage.setItem('authToken', res.token);
+            } else if (typeof res === 'string' && res.length > 0) {
+                // sometimes backend may return token as plain text
+                localStorage.setItem('authToken', res);
+            }
+            // 获取用户信息
+            try {
+                const me = await api.me();
+                if (me) localStorage.setItem('user', JSON.stringify(me));
+            } catch (e) {
+                // ignore me failure
+            }
+            localStorage.removeItem('guest');
+            navigateTo('home');
+        } catch (err) {
+            const msg = (err && err.message) ? err.message : JSON.stringify(err);
+            setError(msg || '登录失败');
+            // refresh captcha on failure
+            refreshCaptcha();
+        }
     };
 
     return (
@@ -169,7 +240,12 @@ const Login = ({ navigateTo }) => {
                         />
                     </div>
                     <div className="select-none px-2 py-1 rounded border bg-white shadow-sm cursor-pointer" title="点击刷新验证码">
-                        <canvas ref={canvasRef} width="140" height="48" onClick={refreshCaptcha} />
+                        {useServerCaptcha && captcha ? (
+                            // server returned an image (data URI) or text
+                            <img src={captcha} alt="captcha" width={140} height={48} onClick={refreshCaptcha} />
+                        ) : (
+                            <canvas ref={canvasRef} width="140" height="48" onClick={refreshCaptcha} />
+                        )}
                     </div>
                 </div>
 

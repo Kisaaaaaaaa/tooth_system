@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
-// 如果需要对接后端，请在 `src/api/auth.js` 中实现并导入 register 方法
-// import { register as apiRegister } from '../../api/auth';
+import api from '../../api/auth';
 
 const Register = ({ navigateTo }) => {
     const [role, setRole] = useState('user'); // 默认展示普通用户
@@ -24,26 +23,29 @@ const Register = ({ navigateTo }) => {
 
         const user = { role, name, phone };
 
-        if (role === 'doctor') {
-            // 医生注册需要审核：前端标记为待审核状态，后端应提供审核流程。
-            // 不要求上传凭证（按需求）。
-            localStorage.setItem('pendingRegistration', JSON.stringify(user));
-            setSubmitted(true);
-            // 后续：调用后端接口 apiRegister({ ... }) 并设置状态为 pending
-            return;
+        try {
+            const res = await api.register({ role, name, phone, password });
+            // 若医生需审核，后端通常会返回 200/202 表示已接收
+            if (role === 'doctor') {
+                localStorage.setItem('pendingRegistration', JSON.stringify(user));
+                setSubmitted(true);
+                return;
+            }
+
+            // 普通用户：如果后端返回 token 或用户信息，则保存并登录
+            if (res && res.token) {
+                localStorage.setItem('authToken', res.token);
+            }
+            try {
+                const me = await api.me();
+                if (me) localStorage.setItem('user', JSON.stringify(me));
+            } catch (e) {}
+            localStorage.removeItem('guest');
+            navigateTo('home');
+        } catch (err) {
+            const msg = (err && err.message) ? err.message : JSON.stringify(err);
+            setError(msg || '注册失败');
         }
-
-        // 普通用户可直接注册并登录（前端模拟）
-        localStorage.setItem('user', JSON.stringify(user));
-        localStorage.removeItem('guest');
-        navigateTo('home');
-
-        // 如果对接后端，示例：
-        // try {
-        //   await apiRegister({ role, name, phone, password });
-        // } catch (err) {
-        //   setError(err.message || '注册失败');
-        // }
     };
 
     return (
