@@ -1,8 +1,48 @@
 import React, { useState, useEffect } from 'react';
 import { MapPin, User, MessageSquare, FileText, Building, Clock, TrendingUp, Heart, Users } from 'lucide-react';
+import { getHomeStatistics } from '../../api/statistics';
 
 // 首页组件
 const HomePage = ({ navigateTo }) => {
+    // 统计数据状态
+    const [statistics, setStatistics] = useState({
+        cooperation_clinics: 2000,
+        appointment_efficiency: 98,
+        revenue_growth: 45,
+        patient_satisfaction: 95,
+        today_patients: 128,
+        online_doctors: 12
+    });
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
+
+    // 获取统计数据
+    useEffect(() => {
+        const fetchStatistics = async () => {
+            try {
+                setLoading(true);
+                setError(null);
+                const response = await getHomeStatistics();
+
+                // 处理响应数据
+                if (response && response.code === 200 && response.data) {
+                    setStatistics(response.data);
+                } else {
+                    // 如果响应格式不符合预期，使用默认值
+                    console.warn('统计数据格式不符合预期，使用默认值', response);
+                }
+            } catch (err) {
+                console.error('获取统计数据失败:', err);
+                setError(err.message || '获取统计数据失败');
+                // 发生错误时保持默认值，不更新状态
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchStatistics();
+    }, []);
+
     return (
         <div className="space-y-6 animate-fade-in">
             <HeroCarousel navigateTo={navigateTo} />
@@ -29,65 +69,79 @@ const HomePage = ({ navigateTo }) => {
                 <div className="bg-gradient-to-r from-blue-50 to-cyan-50 rounded-2xl p-8 shadow-sm border border-slate-100 mt-8">
                     <div className="text-center mb-8">
                         <h2 className="text-3xl font-bold text-slate-800 mb-3">数据见证成效</h2>
+                        {error && (
+                            <p className="text-sm text-red-500 mt-2">数据加载失败，显示默认值</p>
+                        )}
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {/* 第一行：3个指标 */}
-                        <div className="bg-white rounded-xl p-6 shadow-sm border-t-4 border-blue-500 hover:shadow-md transition-shadow flex flex-col items-center text-center">
-                            <div className="p-4 rounded-xl bg-blue-50 mb-4">
-                                <Building className="text-blue-500" size={28} />
-                            </div>
-                            <div className="text-4xl font-bold text-slate-800 mb-2">2000+</div>
-                            <div className="font-medium text-slate-700 text-lg">合作诊所</div>
-                            <div className="text-sm text-slate-500 mt-2">全国超过2000家牙科诊所的选择</div>
+                    {loading ? (
+                        <div className="text-center py-12">
+                            <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+                            <p className="mt-4 text-slate-600">加载中...</p>
                         </div>
+                    ) : (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                            {/* 第一行：3个指标 */}
+                            <div className="bg-white rounded-xl p-6 shadow-sm border-t-4 border-blue-500 hover:shadow-md transition-shadow flex flex-col items-center text-center">
+                                <div className="p-4 rounded-xl bg-blue-50 mb-4">
+                                    <Building className="text-blue-500" size={28} />
+                                </div>
+                                <div className="text-4xl font-bold text-slate-800 mb-2">
+                                    {statistics.cooperation_clinics >= 1000
+                                        ? `${(statistics.cooperation_clinics / 1000).toFixed(0)}K+`
+                                        : `${statistics.cooperation_clinics}+`}
+                                </div>
+                                <div className="font-medium text-slate-700 text-lg">合作诊所</div>
+                                <div className="text-sm text-slate-500 mt-2">全国超过{statistics.cooperation_clinics}家牙科诊所的选择</div>
+                            </div>
 
-                        <div className="bg-white rounded-xl p-6 shadow-sm border-t-4 border-green-500 hover:shadow-md transition-shadow flex flex-col items-center text-center">
-                            <div className="p-4 rounded-xl bg-green-50 mb-4">
-                                <Clock className="text-green-500" size={28} />
+                            <div className="bg-white rounded-xl p-6 shadow-sm border-t-4 border-green-500 hover:shadow-md transition-shadow flex flex-col items-center text-center">
+                                <div className="p-4 rounded-xl bg-green-50 mb-4">
+                                    <Clock className="text-green-500" size={28} />
+                                </div>
+                                <div className="text-4xl font-bold text-slate-800 mb-2">{statistics.appointment_efficiency}%</div>
+                                <div className="font-medium text-slate-700 text-lg">预约效率提升</div>
+                                <div className="text-sm text-slate-500 mt-2">平均预约处理时间缩短{statistics.appointment_efficiency}%</div>
                             </div>
-                            <div className="text-4xl font-bold text-slate-800 mb-2">98%</div>
-                            <div className="font-medium text-slate-700 text-lg">预约效率提升</div>
-                            <div className="text-sm text-slate-500 mt-2">平均预约处理时间缩短98%</div>
-                        </div>
 
-                        <div className="bg-white rounded-xl p-6 shadow-sm border-t-4 border-amber-500 hover:shadow-md transition-shadow flex flex-col items-center text-center">
-                            <div className="p-4 rounded-xl bg-amber-50 mb-4">
-                                <TrendingUp className="text-amber-500" size={28} />
+                            <div className="bg-white rounded-xl p-6 shadow-sm border-t-4 border-amber-500 hover:shadow-md transition-shadow flex flex-col items-center text-center">
+                                <div className="p-4 rounded-xl bg-amber-50 mb-4">
+                                    <TrendingUp className="text-amber-500" size={28} />
+                                </div>
+                                <div className="text-4xl font-bold text-slate-800 mb-2">{statistics.revenue_growth}%</div>
+                                <div className="font-medium text-slate-700 text-lg">收入增长</div>
+                                <div className="text-sm text-slate-500 mt-2">诊所平均收入增长{statistics.revenue_growth}%</div>
                             </div>
-                            <div className="text-4xl font-bold text-slate-800 mb-2">45%</div>
-                            <div className="font-medium text-slate-700 text-lg">收入增长</div>
-                            <div className="text-sm text-slate-500 mt-2">诊所平均收入增长45%</div>
-                        </div>
 
-                        {/* 第二行：3个指标 */}
-                        <div className="bg-white rounded-xl p-6 shadow-sm border-t-4 border-pink-500 hover:shadow-md transition-shadow flex flex-col items-center text-center">
-                            <div className="p-4 rounded-xl bg-pink-50 mb-4">
-                                <Heart className="text-pink-500" size={28} />
+                            {/* 第二行：3个指标 */}
+                            <div className="bg-white rounded-xl p-6 shadow-sm border-t-4 border-pink-500 hover:shadow-md transition-shadow flex flex-col items-center text-center">
+                                <div className="p-4 rounded-xl bg-pink-50 mb-4">
+                                    <Heart className="text-pink-500" size={28} />
+                                </div>
+                                <div className="text-4xl font-bold text-slate-800 mb-2">{statistics.patient_satisfaction}%</div>
+                                <div className="font-medium text-slate-700 text-lg">患者满意度</div>
+                                <div className="text-sm text-slate-500 mt-2">患者满意度提升至{statistics.patient_satisfaction}%以上</div>
                             </div>
-                            <div className="text-4xl font-bold text-slate-800 mb-2">95%</div>
-                            <div className="font-medium text-slate-700 text-lg">患者满意度</div>
-                            <div className="text-sm text-slate-500 mt-2">患者满意度提升至95%以上</div>
-                        </div>
 
-                        <div className="bg-white rounded-xl p-6 shadow-sm border-t-4 border-cyan-500 hover:shadow-md transition-shadow flex flex-col items-center text-center">
-                            <div className="p-4 rounded-xl bg-cyan-50 mb-4">
-                                <Users className="text-cyan-500" size={28} />
+                            <div className="bg-white rounded-xl p-6 shadow-sm border-t-4 border-cyan-500 hover:shadow-md transition-shadow flex flex-col items-center text-center">
+                                <div className="p-4 rounded-xl bg-cyan-50 mb-4">
+                                    <Users className="text-cyan-500" size={28} />
+                                </div>
+                                <div className="text-4xl font-bold text-slate-800 mb-2">{statistics.today_patients}</div>
+                                <div className="font-medium text-slate-700 text-lg">今日接诊</div>
+                                <div className="text-sm text-slate-500 mt-2">今日累计接诊患者数</div>
                             </div>
-                            <div className="text-4xl font-bold text-slate-800 mb-2">128</div>
-                            <div className="font-medium text-slate-700 text-lg">今日接诊</div>
-                            <div className="text-sm text-slate-500 mt-2">今日累计接诊患者数</div>
-                        </div>
 
-                        <div className="bg-white rounded-xl p-6 shadow-sm border-t-4 border-purple-500 hover:shadow-md transition-shadow flex flex-col items-center text-center">
-                            <div className="p-4 rounded-xl bg-purple-50 mb-4">
-                                <User className="text-purple-500" size={28} />
+                            <div className="bg-white rounded-xl p-6 shadow-sm border-t-4 border-purple-500 hover:shadow-md transition-shadow flex flex-col items-center text-center">
+                                <div className="p-4 rounded-xl bg-purple-50 mb-4">
+                                    <User className="text-purple-500" size={28} />
+                                </div>
+                                <div className="text-4xl font-bold text-slate-800 mb-2">{statistics.online_doctors}</div>
+                                <div className="font-medium text-slate-700 text-lg">在线医生</div>
+                                <div className="text-sm text-slate-500 mt-2">当前在线提供服务的医生</div>
                             </div>
-                            <div className="text-4xl font-bold text-slate-800 mb-2">12</div>
-                            <div className="font-medium text-slate-700 text-lg">在线医生</div>
-                            <div className="text-sm text-slate-500 mt-2">当前在线提供服务的医生</div>
                         </div>
-                    </div>
+                    )}
                 </div>
             </div>
         </div>
