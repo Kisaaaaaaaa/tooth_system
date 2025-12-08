@@ -8,7 +8,7 @@ const RecordsList = ({ onSelect }) => {
     const [error, setError] = useState(null);
     const [page, setPage] = useState(1);
     const [pageSize, setPageSize] = useState(10);
-    const [patientName, setPatientName] = useState('');
+    // NOTE: 仅显示当前登录用户的病例，前端不提供按病人姓名查询
     const [doctorName, setDoctorName] = useState('');
     const [dateFrom, setDateFrom] = useState('');
     const [dateTo, setDateTo] = useState('');
@@ -17,12 +17,12 @@ const RecordsList = ({ onSelect }) => {
         setLoading(true); setError(null);
         try {
             const params = { page, page_size: pageSize };
-            if (patientName) params.patient_name = patientName;
+            // 不发送 patient_name，后端应仅返回当前用户的记录
             if (doctorName) params.doctor_name = doctorName;
             if (dateFrom) params.date_from = dateFrom;
             if (dateTo) params.date_to = dateTo;
             const data = await recordsApi.listRecords(params);
-            // assume backend returns { results: [...], total, page, page_size }
+            // assume backend returns { results: [...], total, page, page_size } or array
             if (Array.isArray(data)) setRecords(data);
             else if (data.results) setRecords(data.results);
             else setRecords([]);
@@ -36,8 +36,8 @@ const RecordsList = ({ onSelect }) => {
     return (
         <div className="space-y-4">
             <div className="bg-white p-4 rounded-lg shadow-sm flex items-center gap-3">
-                <input className="border rounded px-3 py-2 text-sm flex-1" placeholder="病人姓名" value={patientName} onChange={e=>setPatientName(e.target.value)} />
-                <input className="border rounded px-3 py-2 text-sm flex-1" placeholder="医生姓名" value={doctorName} onChange={e=>setDoctorName(e.target.value)} />
+                {/* 仅允许在当前用户的病例中按医生或日期筛选 */}
+                <input className="border rounded px-3 py-2 text-sm flex-1" placeholder="医生姓名（可选）" value={doctorName} onChange={e=>setDoctorName(e.target.value)} />
                 <input type="date" className="border rounded px-3 py-2 text-sm" value={dateFrom} onChange={e=>setDateFrom(e.target.value)} />
                 <input type="date" className="border rounded px-3 py-2 text-sm" value={dateTo} onChange={e=>setDateTo(e.target.value)} />
                 <button onClick={() => { setPage(1); fetchList(); }} className="px-4 py-2 bg-cyan-600 text-white rounded">筛选</button>

@@ -10,6 +10,7 @@ const RecordsPage = () => {
     return (
         <div className="space-y-6 animate-fade-in">
             <h2 className="text-xl font-bold text-slate-800">就诊档案</h2>
+            <div className="text-sm text-slate-500">仅显示当前登录用户的病例；无法查询或查看其他用户的病例。</div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="md:col-span-2">
