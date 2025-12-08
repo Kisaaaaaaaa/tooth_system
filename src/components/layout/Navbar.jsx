@@ -72,10 +72,11 @@ const Navbar = ({ currentPage, navigateTo }) => {
                 </div>
 
                 <div className="flex items-center gap-4">
-                    <div className="hidden md:flex items-center gap-3">
-                        {user ? (
+                    {/* 按钮在所有屏幕显示，登录状态以 authToken 或 user 判断 */}
+                    <div className="flex items-center gap-3">
+                        { (localStorage.getItem('authToken') || user) ? (
                             <>
-                                <span className="text-sm text-slate-700">{user.name || user.phone || '已登录'}</span>
+                                <span className="text-sm text-slate-700">{user ? (user.name || user.phone) : '已登录'}</span>
                                 <button onClick={handleLogout} className="text-sm px-3 py-1 rounded border border-slate-200 hover:bg-slate-50 transition">登出</button>
                             </>
                         ) : (
@@ -98,7 +99,11 @@ const Navbar = ({ currentPage, navigateTo }) => {
                     </div>
 
                     <div className="w-8 h-8 rounded-full bg-slate-200 overflow-hidden border border-slate-300">
-                        <img src="https://i.pravatar.cc/150?u=user" alt="User" />
+                        <img
+                            src={user && user.avatar ? user.avatar : 'https://i.pravatar.cc/150?u=user'}
+                            alt={user && (user.name || user.phone) ? (user.name || user.phone) : 'User'}
+                            className="object-cover w-full h-full"
+                        />
                     </div>
                 </div>
             </div>
