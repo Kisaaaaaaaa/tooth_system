@@ -47,5 +47,5 @@ export async function inquiryWithFiles({ question, context = {}, files } = {}) {
     return handleResp(resp);
 }
 
-const ai = { inquiry };
+const ai = { inquiry, inquiryWithFiles };
 export default ai;
