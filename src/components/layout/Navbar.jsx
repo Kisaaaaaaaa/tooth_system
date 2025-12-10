@@ -16,35 +16,83 @@ const Navbar = ({ currentPage, navigateTo }) => {
 
     const [user, setUser] = useState(null);
 
-    useEffect(() => {
-        const raw = localStorage.getItem('user');
-        if (raw) {
-            try { setUser(JSON.parse(raw)); } catch { setUser(null); }
+    // 检查登录状态
+    const checkLoginStatus = () => {
+        // 确保localStorage在浏览器环境中可用
+        if (typeof localStorage === 'undefined') {
+            console.log('localStorage不可用');
+            setUser(null);
+            return;
         }
+        
+        // 同时检查access_token和authToken
+        const token = localStorage.getItem('access_token') || localStorage.getItem('authToken');
+        const rawUser = localStorage.getItem('user');
+        
+        console.log('检查登录状态:', { token: !!token, user: !!rawUser });
+        
+        if (rawUser) {
+            try { 
+                const parsedUser = JSON.parse(rawUser);
+                console.log('解析后的用户信息:', parsedUser);
+                setUser(parsedUser); 
+            } catch (e) {
+                console.error('解析用户信息失败:', e);
+                setUser(null);
+                localStorage.removeItem('user');
+            }
+        } else {
+            setUser(null);
+        }
+    };
+
+    useEffect(() => {
+        // 组件挂载时检查登录状态
+        checkLoginStatus();
 
         const onStorage = (e) => {
-            if (e.key === 'user' || e.key === 'authToken') {
-                const r = localStorage.getItem('user');
-                if (r) { try { setUser(JSON.parse(r)); } catch { setUser(null); } }
-                else setUser(null);
+            if (e.key === 'user' || e.key === 'authToken' || e.key === 'access_token') {
+                checkLoginStatus();
             }
         };
+        
+        // 监听localStorage变化
         window.addEventListener('storage', onStorage);
-        return () => window.removeEventListener('storage', onStorage);
+        
+        // 也监听窗口聚焦事件，确保状态同步
+        const onFocus = () => {
+            checkLoginStatus();
+        };
+        window.addEventListener('focus', onFocus);
+        
+        return () => {
+            window.removeEventListener('storage', onStorage);
+            window.removeEventListener('focus', onFocus);
+        };
     }, []);
 
     const handleLogout = async () => {
+        console.log('=== Navbar登出函数开始执行 ===');
+        console.log('登出前localStorage状态:', {
+            authToken: localStorage.getItem('authToken'),
+            user: localStorage.getItem('user')
+        });
+        
         try {
+            console.log('调用api.logout()');
             await api.logout();
+            console.log('api.logout()调用完成');
         } catch (e) {
+            console.error('api.logout()调用失败:', e);
             // ignore server error, still clear client state
         }
-        localStorage.removeItem('authToken');
-        localStorage.removeItem('user');
-        localStorage.removeItem('pendingRegistration');
-        localStorage.removeItem('guest');
+        
+        console.log('重置用户状态');
         setUser(null);
+        
+        console.log('跳转到首页');
         navigateTo('home');
+        console.log('=== Navbar登出函数执行结束 ===');
     };
 
     return (
@@ -74,10 +122,14 @@ const Navbar = ({ currentPage, navigateTo }) => {
                 <div className="flex items-center gap-4">
                     {/* 按钮在所有屏幕显示，登录状态以 authToken 或 user 判断 */}
                     <div className="flex items-center gap-3">
-                        { (localStorage.getItem('authToken') || user) ? (
+                        {/* 管理员入口（始终显示，方便查看界面） */}
+                        <button onClick={() => navigateTo('admin')} className="text-sm px-3 py-1 rounded bg-slate-100 hover:bg-slate-50">管理员</button>
+                        
+                        { /* 修复登录状态判断，确保能正确检测到登录状态 */ }
+                        { typeof localStorage !== 'undefined' && (localStorage.getItem('access_token') || localStorage.getItem('authToken')) ? (
                             <>
                                 <span className="text-sm text-slate-700">{user ? (user.name || user.phone) : '已登录'}</span>
-                                <button onClick={handleLogout} className="text-sm px-3 py-1 rounded border border-slate-200 hover:bg-slate-50 transition">登出</button>
+                                <button onClick={handleLogout} className="text-sm px-3 py-1 rounded bg-red-500 text-white hover:bg-red-600 transition">登出</button>
                             </>
                         ) : (
                             <>
