@@ -4,6 +4,7 @@ import Navbar from './components/layout/Navbar';
 import BottomNav from './components/layout/BottomNav';
 import HomePage from './components/pages/HomePage';
 import HospitalsPage from './components/pages/HospitalsPage';
+import HospitalDetailPage from './components/pages/HospitalDetailPage';
 import DoctorsPage from './components/pages/DoctorsPage';
 import ConsultationPage from './components/pages/ConsultationPage';
 import AppointmentsPage from './components/pages/AppointmentsPage';
@@ -18,10 +19,14 @@ import './styles/global.css';
 const DentalApp = () => {
     const [currentPage, setCurrentPage] = useState('home');
     const [selectedDoctor, setSelectedDoctor] = useState(null);
+    const [selectedHospitalId, setSelectedHospitalId] = useState(null);
 
     // Router Logic
     const navigateTo = (page, params = {}) => {
         setCurrentPage(page);
+        if (params.hospitalId) {
+            setSelectedHospitalId(params.hospitalId);
+        }
         window.scrollTo({ top: 0, behavior: 'smooth' });
     };
 
@@ -54,7 +59,8 @@ const DentalApp = () => {
                 </main>
             ) : (
                 <main className="max-w-7xl mx-auto p-4 md:p-6">
-                    {currentPage === 'hospitals' && <HospitalsPage />}
+                    {currentPage === 'hospitals' && <HospitalsPage navigateTo={navigateTo} />}
+                    {currentPage === 'hospitalDetail' && <HospitalDetailPage navigateTo={navigateTo} hospitalId={selectedHospitalId} />}
                     {currentPage === 'doctors' && <DoctorsPage navigateTo={navigateTo} startConsultation={startConsultation} />}
                     {currentPage === 'consultation' && <ConsultationPage currentDoctor={selectedDoctor} />}
                     {currentPage === 'appointment' && <AppointmentsPage />}
