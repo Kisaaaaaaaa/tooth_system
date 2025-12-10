@@ -1,6 +1,6 @@
 import { buildQuery } from './utils';
 
-const API_ROOT = '';
+const API_ROOT = 'http://10.83.132.102:8000/api';
 
 function getAuthHeaders() {
     const h = new Headers();
@@ -10,11 +10,47 @@ function getAuthHeaders() {
 }
 
 async function handleResp(resp) {
-    const text = await resp.text();
-    let body = text;
-    try { body = JSON.parse(text); } catch (e) { /* keep raw text */ }
+    const ct = resp.headers.get('content-type') || '';
+    let body;
+    if (ct.includes('application/json')) {
+        body = await resp.json();
+    } else {
+        body = await resp.text();
+    }
     if (!resp.ok) {
-        const err = new Error('HTTP error');
+        // 尝试解析错误信息，提取用户友好的提示
+        let errorMessage = '';
+        
+        if (body.message) {
+            try {
+                const messageStr = body.message;
+                const errors = [];
+                
+                // 直接使用正则表达式提取所有中文错误信息
+                const errorMatches = messageStr.match(/'([^']*[\u4e00-\u9fa5]+[^']*)'/g);
+                
+                if (errorMatches) {
+                    // 移除引号并将所有错误信息合并
+                    errorMatches.forEach(match => {
+                        errors.push(match.replace(/'/g, ''));
+                    });
+                    errorMessage = errors.join('；');
+                } else {
+                    // 如果没有找到中文错误，使用原始错误信息
+                    errorMessage = messageStr;
+                }
+            } catch (e) {
+                // 如果解析失败，使用原始message
+                errorMessage = body.message;
+            }
+        }
+        
+        // 如果没有提取到错误信息，使用默认的错误提示
+        if (!errorMessage) {
+            errorMessage = `${resp.status} ${resp.statusText}`;
+        }
+        
+        const err = new Error(errorMessage);
         err.status = resp.status;
         err.body = body;
         throw err;

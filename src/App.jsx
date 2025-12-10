@@ -9,6 +9,7 @@ import ConsultationPage from './components/pages/ConsultationPage';
 import AppointmentsPage from './components/pages/AppointmentsPage';
 import RecordsPage from './components/pages/RecordsPage';
 import AiInquiryPage from './components/pages/AiInquiryPage';
+import AdminDashboard from './components/admin/AdminDashboard';
 import ThreeDModelPage from './components/pages/ThreeDModelPage';
 import Login from './components/Auth/Login';
 import Register from './components/Auth/Register';
@@ -60,6 +61,7 @@ const DentalApp = () => {
                     {currentPage === 'appointment' && <AppointmentsPage />}
                     {currentPage === 'records' && <RecordsPage />}
                     {currentPage === 'aiInquiry' && <AiInquiryPage />}
+                    {currentPage === 'admin' && <AdminDashboard />}
                 </main>
             )}
 
