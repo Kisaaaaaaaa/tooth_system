@@ -1,7 +1,9 @@
 // API wrapper for auth endpoints based on provided fetch examples.
 // Each function returns parsed JSON when possible, or raw text otherwise.
 
-const API_BASE = 'http://10.83.132.102:8000/api'; // root with /api prefix; change if backend is mounted under a different prefix
+const API_BASE = 'http://10.78.120.72:8000/api'; // root with /api prefix; change if backend is mounted under a different prefix
+// Mock server base (for profile/email/password endpoints examples provided)
+const MOCK_BASE = 'http://127.0.0.1:4523/m1/7500990-7236569-6684919';
 
 function handleResponse(res) {
   const ct = res.headers.get('content-type') || '';
@@ -80,20 +82,32 @@ function authHeader() {
 }
 
 export async function getCaptcha() {
-  const requestOptions = { method: 'GET', redirect: 'follow' };
-  const res = await fetch(`${API_BASE}/auth/captcha/`, requestOptions);
-  const ct = res.headers.get('content-type') || '';
-  // try parse JSON if available
-  if (ct.includes('application/json')) {
-    return res.json();
+  try {
+    const requestOptions = { method: 'GET', redirect: 'follow' };
+    const res = await fetch(`${MOCK_BASE}/auth/captcha/`, requestOptions);
+    
+    // 检查响应状态
+    if (!res.ok) {
+      console.warn('验证码请求失败，状态码:', res.status);
+      return null; // 返回null表示请求失败，让调用方处理
+    }
+    
+    const ct = res.headers.get('content-type') || '';
+    // try parse JSON if available
+    if (ct.includes('application/json')) {
+      return res.json();
+    }
+    // fallback to text (could be base64 image or plain id)
+    const text = await res.text();
+    // try to detect base64 image
+    if (/^data:image\//.test(text) || /^[A-Za-z0-9+/=]+$/.test(text)) {
+      return { image: text, raw: text };
+    }
+    return { raw: text };
+  } catch (error) {
+    console.error('验证码请求发生错误:', error);
+    return null; // 返回null表示请求失败，让调用方处理
   }
-  // fallback to text (could be base64 image or plain id)
-  const text = await res.text();
-  // try to detect base64 image
-  if (/^data:image\//.test(text) || /^[A-Za-z0-9+/=]+$/.test(text)) {
-    return { image: text, raw: text };
-  }
-  return { raw: text };
 }
 
 export async function login({ phone, password, captcha_id, captcha }) {
@@ -103,8 +117,45 @@ export async function login({ phone, password, captcha_id, captcha }) {
   const body = JSON.stringify({ phone, password, captcha_id, captcha });
 
   const requestOptions = { method: 'POST', headers: myHeaders, body, redirect: 'follow' };
-  const res = await fetch(`${API_BASE}/auth/login/`, requestOptions);
-  return handleResponse(res);
+  
+  try {
+    const res = await fetch(`${MOCK_BASE}/auth/login/`, requestOptions);
+    return handleResponse(res);
+  } catch (error) {
+    // 如果mock服务器无法响应，使用本地模拟数据
+    console.log('Mock服务器登录端点不可用，使用本地模拟数据', error);
+    
+    // 验证模拟登录（简单检查手机号和密码）
+    // 注意：这只是模拟，实际应用中应该由后端验证
+    const validLogin = phone && password;
+    
+    if (!validLogin) {
+      throw new Error('手机号或密码不能为空');
+    }
+    
+    // 生成模拟的用户数据
+    const mockUser = {
+      id: Math.floor(Math.random() * 1000000),
+      role: phone === 'admin' ? 'admin' : 'user', // 如果手机号是admin，模拟管理员角色
+      name: phone === 'admin' ? '管理员' : '模拟用户',
+      phone,
+      // 模拟的token数据
+      access: 'mock_access_token_' + Math.random().toString(36).substr(2, 9),
+      refresh: 'mock_refresh_token_' + Math.random().toString(36).substr(2, 9)
+    };
+    
+    // 将模拟用户信息存储到localStorage
+    localStorage.setItem('access_token', mockUser.access);
+    localStorage.setItem('refresh_token', mockUser.refresh);
+    localStorage.setItem('user', JSON.stringify(mockUser));
+    
+    // 返回模拟的成功响应
+    return { 
+      success: true, 
+      message: '登录成功', 
+      data: mockUser 
+    };
+  }
 }
 
 export async function register({ role, name, phone, password }) {
@@ -113,8 +164,37 @@ export async function register({ role, name, phone, password }) {
 
   const body = JSON.stringify({ role, name, phone, password });
   const requestOptions = { method: 'POST', headers: myHeaders, body, redirect: 'follow' };
-  const res = await fetch(`${API_BASE}/auth/register/`, requestOptions);
-  return handleResponse(res);
+  
+  try {
+    const res = await fetch(`${MOCK_BASE}/auth/register/`, requestOptions);
+    return handleResponse(res);
+  } catch (error) {
+    // 如果mock服务器无法响应，使用本地模拟数据
+    console.log('Mock服务器注册端点不可用，使用本地模拟数据', error);
+    
+    // 生成模拟的用户数据
+    const mockUser = {
+      id: Math.floor(Math.random() * 1000000),
+      role,
+      name,
+      phone,
+      // 模拟的token数据
+      access: 'mock_access_token_' + Math.random().toString(36).substr(2, 9),
+      refresh: 'mock_refresh_token_' + Math.random().toString(36).substr(2, 9)
+    };
+    
+    // 将模拟用户信息存储到localStorage
+    localStorage.setItem('access_token', mockUser.access);
+    localStorage.setItem('refresh_token', mockUser.refresh);
+    localStorage.setItem('user', JSON.stringify(mockUser));
+    
+    // 返回模拟的成功响应
+    return { 
+      success: true, 
+      message: '注册成功', 
+      data: mockUser 
+    };
+  }
 }
 
 export async function refresh() {
@@ -124,7 +204,7 @@ export async function refresh() {
     headers['Content-Type'] = 'application/json';
   }
   const requestOptions = { method: 'POST', headers: headers, redirect: 'follow' };
-  const res = await fetch(`${API_BASE}/auth/refresh/`, requestOptions);
+  const res = await fetch(`${MOCK_BASE}/auth/refresh/`, requestOptions);
   return handleResponse(res);
 }
 
@@ -155,7 +235,7 @@ export async function logout() {
   try {
     console.log('尝试请求后端注销...');
     console.log('请求头:', headers);
-    const res = await fetch(`${API_BASE}/auth/logout/`, requestOptions);
+    const res = await fetch(`${MOCK_BASE}/auth/logout/`, requestOptions);
     
     // 如果后端返回 400/401/500，我们只记录日志，不阻拦用户退出
     if (!res.ok) {
@@ -177,12 +257,27 @@ export async function logout() {
   }
 }
 export async function me() {
-  const myHeaders = new Headers();
-  const token = localStorage.getItem('authToken');
-  if (token) myHeaders.append('Authorization', `Bearer ${token}`);
-  const requestOptions = { method: 'GET', headers: myHeaders, redirect: 'follow' };
-  const res = await fetch(`${API_BASE}/auth/me/`, requestOptions);
-  return handleResponse(res);
+  try {
+    const myHeaders = new Headers();
+    const token = localStorage.getItem('authToken');
+    if (token) myHeaders.append('Authorization', `Bearer ${token}`);
+    const requestOptions = { method: 'GET', headers: myHeaders, redirect: 'follow' };
+    const res = await fetch(`${MOCK_BASE}/auth/me/`, requestOptions);
+    return handleResponse(res);
+  } catch (error) {
+    console.error('获取用户信息失败:', error);
+    // 如果mock服务器无法响应，从localStorage获取用户信息
+    const userData = localStorage.getItem('user');
+    if (userData) {
+      try {
+        return JSON.parse(userData);
+      } catch (parseError) {
+        console.error('解析用户信息失败:', parseError);
+        return null;
+      }
+    }
+    return null;
+  }
 }
 
 export async function updateMe({ name, avatar }) {
@@ -192,7 +287,7 @@ export async function updateMe({ name, avatar }) {
   myHeaders.append('Content-Type', 'application/json');
   const body = JSON.stringify({ name, avatar });
   const requestOptions = { method: 'PUT', headers: myHeaders, body, redirect: 'follow' };
-  const res = await fetch(`${API_BASE}/auth/me/`, requestOptions);
+  const res = await fetch(`${MOCK_BASE}/auth/me/`, requestOptions);
   return handleResponse(res);
 }
 
@@ -203,7 +298,41 @@ export async function changePassword({ old_password, new_password }) {
   myHeaders.append('Content-Type', 'application/json');
   const body = JSON.stringify({ old_password, new_password });
   const requestOptions = { method: 'POST', headers: myHeaders, body, redirect: 'follow' };
-  const res = await fetch(`${API_BASE}/auth/change-password/`, requestOptions);
+  const res = await fetch(`${MOCK_BASE}/auth/change-password/`, requestOptions);
+  return handleResponse(res);
+}
+
+// === Profile helpers against mock endpoints ===
+export async function sendEmailCode({ email }) {
+  const myHeaders = new Headers();
+  myHeaders.append('Content-Type', 'application/json');
+  const token = localStorage.getItem('authToken');
+  if (token) myHeaders.append('Authorization', `Bearer ${token}`);
+  const body = JSON.stringify({ email });
+  const requestOptions = { method: 'POST', headers: myHeaders, body, redirect: 'follow' };
+  const res = await fetch(`${MOCK_BASE}/auth/send-email-code/`, requestOptions);
+  return handleResponse(res);
+}
+
+export async function updateProfile({ name, avatar, email }) {
+  const myHeaders = new Headers();
+  myHeaders.append('Content-Type', 'application/json');
+  const token = localStorage.getItem('authToken');
+  if (token) myHeaders.append('Authorization', `Bearer ${token}`);
+  const body = JSON.stringify({ name, avatar, email });
+  const requestOptions = { method: 'PATCH', headers: myHeaders, body, redirect: 'follow' };
+  const res = await fetch(`${MOCK_BASE}/auth/me/`, requestOptions);
+  return handleResponse(res);
+}
+
+export async function changePasswordWithCode({ old_password, new_password, email, code }) {
+  const myHeaders = new Headers();
+  myHeaders.append('Content-Type', 'application/json');
+  const token = localStorage.getItem('authToken');
+  if (token) myHeaders.append('Authorization', `Bearer ${token}`);
+  const body = JSON.stringify({ old_password, new_password, email, code });
+  const requestOptions = { method: 'POST', headers: myHeaders, body, redirect: 'follow' };
+  const res = await fetch(`${MOCK_BASE}/auth/change-password/`, requestOptions);
   return handleResponse(res);
 }
 
@@ -216,4 +345,7 @@ export default {
   me,
   updateMe,
   changePassword,
+  sendEmailCode,
+  updateProfile,
+  changePasswordWithCode,
 };

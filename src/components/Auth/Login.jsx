@@ -11,42 +11,56 @@ const generateCaptcha = (length = 5) => {
 const Login = ({ navigateTo }) => {
     const [phone, setPhone] = useState('');
     const [password, setPassword] = useState('');
-    const [captcha, setCaptcha] = useState('');
+    const [captchaText, setCaptchaText] = useState('');
+    const [captchaImage, setCaptchaImage] = useState('');
     const [captchaInput, setCaptchaInput] = useState('');
     const [error, setError] = useState('');
 
+
+
     useEffect(() => {
-        // try fetch server captcha; fallback to local generated captcha
+        // 立即显示本地验证码，异步尝试请求服务器验证码，2秒后无论如何都允许交互
         let mounted = true;
+        setCaptchaText(generateCaptcha(5));
+        setCaptchaImage('');
+        setUseServerCaptcha(false);
+
+        let finished = false;
+        const timeoutId = setTimeout(() => {
+            finished = true;
+            // 2秒后无论接口是否返回，都不再等待，页面可交互
+        }, 2000);
+
         api.getCaptcha().then(r => {
-            if (!mounted) return;
-            // server may return { id, image } or raw text
+            if (!mounted || finished) return;
+            clearTimeout(timeoutId);
+            // 如果r为null，表示请求失败，保持本地验证码
             if (r && (r.image || r.raw || r.captcha)) {
-                // if image provided, display image; if raw text, treat as captcha string
                 if (r.image) {
-                    setCaptcha(r.image);
+                    setCaptchaImage(r.image);
+                    setCaptchaText('');
                     setCaptchaId(r.id || r.captcha_id || null);
                     setUseServerCaptcha(true);
                 } else if (r.raw) {
-                    // if it's base64 data without data: prefix, add prefix
                     if (/^[A-Za-z0-9+/=]+$/.test(r.raw)) {
-                        setCaptcha('data:image/png;base64,' + r.raw);
+                        setCaptchaImage('data:image/png;base64,' + r.raw);
+                        setCaptchaText('');
                         setUseServerCaptcha(true);
                         setCaptchaId(null);
                     } else {
-                        setCaptcha(r.raw);
+                        setCaptchaImage('');
+                        setCaptchaText(r.raw);
                         setUseServerCaptcha(false);
                     }
                 } else {
-                    setCaptcha(String(r));
+                    setCaptchaImage('');
+                    setCaptchaText(String(r));
                 }
-            } else {
-                setCaptcha(generateCaptcha(5));
             }
         }).catch(() => {
-            setCaptcha(generateCaptcha(5));
+            // 保持本地验证码
         });
-        return () => { mounted = false; };
+        return () => { mounted = false; clearTimeout(timeoutId); };
     }, []);
 
     const [captchaId, setCaptchaId] = useState(null);
@@ -55,25 +69,33 @@ const Login = ({ navigateTo }) => {
     const refreshCaptcha = async () => {
         try {
             const r = await api.getCaptcha();
+            // 如果r为null，表示请求失败，使用本地验证码
             if (r && r.image) {
-                setCaptcha(r.image);
+                setCaptchaImage(r.image);
+                setCaptchaText('');
                 setUseServerCaptcha(true);
                 setCaptchaId(r.id || r.captcha_id || null);
             } else if (r && r.raw) {
                 if (/^[A-Za-z0-9+/=]+$/.test(r.raw)) {
-                    setCaptcha('data:image/png;base64,' + r.raw);
+                    setCaptchaImage('data:image/png;base64,' + r.raw);
+                    setCaptchaText('');
                     setUseServerCaptcha(true);
                     setCaptchaId(null);
                 } else {
-                    setCaptcha(r.raw);
+                    setCaptchaImage('');
+                    setCaptchaText(r.raw);
                     setUseServerCaptcha(false);
                 }
             } else {
-                setCaptcha(generateCaptcha(5));
+                const text = generateCaptcha(5);
+                setCaptchaImage('');
+                setCaptchaText(text);
                 setUseServerCaptcha(false);
             }
         } catch (err) {
-            setCaptcha(generateCaptcha(5));
+            const text = generateCaptcha(5);
+            setCaptchaImage('');
+            setCaptchaText(text);
             setUseServerCaptcha(false);
         }
     };
@@ -82,7 +104,7 @@ const Login = ({ navigateTo }) => {
 
     const drawCaptchaCanvas = () => {
         // don't draw local canvas when server captcha image is used
-        if (useServerCaptcha || (typeof captcha === 'string' && captcha.startsWith('data:image/'))) return;
+        if (useServerCaptcha || captchaImage) return;
         const canvas = canvasRef.current;
         if (!canvas) return;
         const ctx = canvas.getContext('2d');
@@ -114,7 +136,7 @@ const Login = ({ navigateTo }) => {
 
         // draw characters with rotation and random color
         // NOTE: previous font sizing could be too large and cause clipping; use smaller font
-        const chars = captcha.split('');
+        const chars = captchaText.split('');
         const charCount = chars.length;
         ctx.textBaseline = 'middle';
         ctx.textAlign = 'center';
@@ -147,8 +169,8 @@ const Login = ({ navigateTo }) => {
 
     useEffect(() => {
         drawCaptchaCanvas();
-        // redraw when captcha changes
-    }, [captcha]);
+        // redraw when captcha text changes
+    }, [captchaText, captchaImage]);
 
     const validatePhone = (p) => {
         // 限制为 11 位数字
@@ -164,7 +186,8 @@ const Login = ({ navigateTo }) => {
             return;
         }
 
-        if (captchaInput.trim().toUpperCase() !== captcha) {
+        // 仅在本地文本验证码时校验；如果是服务器图片验证码，由后端校验
+        if (captchaText && captchaInput.trim().toUpperCase() !== captchaText.toUpperCase()) {
             setError('验证码错误，请刷新后重试');
             refreshCaptcha();
             setCaptchaInput('');
@@ -177,55 +200,55 @@ const Login = ({ navigateTo }) => {
             const payload = { phone, password, captcha_id: captchaId, captcha: captchaInput };
             console.log('登录请求参数:', payload);
             
-            // 直接调用fetch，不经过api.login，以便更直接地查看响应
-            const myHeaders = new Headers();
-            myHeaders.append('Content-Type', 'application/json');
-            const body = JSON.stringify(payload);
-            const requestOptions = { method: 'POST', headers: myHeaders, body, redirect: 'follow' };
-            
-            console.log('发送登录请求到:', `http://10.83.132.102:8000/api/auth/login/`);
-            const rawResponse = await fetch(`http://10.83.132.102:8000/api/auth/login/`, requestOptions);
-            console.log('原始响应状态:', rawResponse.status);
-            console.log('原始响应头:', Object.fromEntries(rawResponse.headers.entries()));
-            
-            // 直接解析响应
-            const responseText = await rawResponse.text();
-            console.log('原始响应文本:', responseText);
-            
-            let res;
-            try {
-                res = JSON.parse(responseText);
-                console.log('解析后的响应JSON:', res);
-            } catch (e) {
-                console.log('响应不是JSON，使用文本:', responseText);
-                res = responseText;
-            }
+            // 使用api.login函数确保使用正确的mock服务器地址
+            const res = await api.login(payload);
+            console.log('登录响应:', res);
             
             // 手动设置localStorage
             if (res && res.token) {
                 console.log('手动设置token:', res.token);
                 localStorage.setItem('authToken', res.token);
-                console.log('设置后的authToken:', localStorage.getItem('authToken'));
+            } else if (res && res.access_token) {
+                console.log('手动设置token为access_token:', res.access_token);
+                localStorage.setItem('authToken', res.access_token);
             } else if (typeof res === 'string' && res.length > 0) {
                 console.log('手动设置token为字符串:', res);
                 localStorage.setItem('authToken', res);
-                console.log('设置后的authToken:', localStorage.getItem('authToken'));
             } else {
                 console.log('登录响应格式异常，无法提取token:', res);
                 // 模拟登录成功，设置测试token
                 localStorage.setItem('authToken', 'test-token-' + Date.now());
-                console.log('模拟设置token:', localStorage.getItem('authToken'));
             }
-            
-            console.log('localStorage中间状态:', {
-                authToken: localStorage.getItem('authToken'),
-                user: localStorage.getItem('user')
-            });
-            
-            // 跳过获取用户信息，直接测试
+
+            // 写入用户信息（兼容后端返回格式）
+            let userObj = null;
+            if (res && res.data) {
+                userObj = res.data;
+            } else if (res && res.user) {
+                userObj = res.user;
+            } else if (res && res.name) {
+                userObj = res;
+            }
+            if (userObj) {
+                localStorage.setItem('user', JSON.stringify(userObj));
+                console.log('设置后的user:', localStorage.getItem('user'));
+            }
+
             localStorage.removeItem('guest');
             console.log('登录流程结束，准备跳转到首页');
-            navigateTo('home');
+            // 跳转到首页并通知页面其它组件 localStorage 已更新
+            if (typeof navigateTo === 'function') {
+                navigateTo(''); // 跳转到首页（/）
+            } else {
+                window.location.href = '/';
+            }
+
+            // 派发自定义事件，便于同一窗口内的组件（如 Navbar）同步状态
+            try {
+                window.dispatchEvent(new Event('localStorageUpdated'));
+            } catch (e) {
+                // ignore
+            }
         } catch (err) {
             const msg = (err && err.message) ? err.message : JSON.stringify(err);
             setError(msg || '登录失败');
@@ -265,19 +288,19 @@ const Login = ({ navigateTo }) => {
 
                 <div className="flex items-center gap-3">
                     <div className="flex-1">
-                        <label className="block text-sm text-slate-600">验证码</label>
-                        <input
-                            value={captchaInput}
-                            onChange={e => setCaptchaInput(e.target.value)}
-                            className="w-full mt-1 px-3 py-2 border rounded text-base placeholder-slate-400"
-                            placeholder="输入图形验证码（不区分大小写）"
-                            required
-                        />
+                    <label className="block text-sm text-slate-600">验证码</label>
+                    <input
+                        type="text"
+                        value={captchaInput}
+                        onChange={e => setCaptchaInput(e.target.value)}
+                        className="w-full mt-1 px-3 py-2 border rounded text-base placeholder-slate-400"
+                        placeholder="输入图形验证码（不区分大小写）"
+                        required
+                    />
                     </div>
                     <div className="select-none px-2 py-1 rounded border bg-white shadow-sm cursor-pointer" title="点击刷新验证码">
-                        {useServerCaptcha && captcha ? (
-                            // server returned an image (data URI) or text
-                            <img src={captcha} alt="captcha" width={140} height={48} onClick={refreshCaptcha} />
+                        {captchaImage ? (
+                            <img src={captchaImage} alt="captcha" width={140} height={48} onClick={refreshCaptcha} />
                         ) : (
                             <canvas ref={canvasRef} width="140" height="48" onClick={refreshCaptcha} />
                         )}
@@ -288,8 +311,9 @@ const Login = ({ navigateTo }) => {
 
                 <div>
                     <button className="w-full px-4 py-3 bg-cyan-600 text-white rounded-lg shadow-sm">登录</button>
-                    <div className="text-center mt-3">
+                    <div className="text-center mt-3 flex flex-col gap-2">
                         <button type="button" onClick={() => navigateTo('register')} className="text-sm text-cyan-600">没有账号？注册</button>
+                        <button type="button" onClick={() => navigateTo('admin')} className="text-xs text-slate-500 underline hover:text-cyan-600">管理员入口</button>
                     </div>
                 </div>
             </form>

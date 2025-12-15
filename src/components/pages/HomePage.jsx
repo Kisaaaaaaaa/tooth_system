@@ -169,7 +169,7 @@ function HeroCarousel({ navigateTo }) {
     }, []);
 
     return (
-        <div className="relative rounded-3xl overflow-hidden shadow-2xl h-[65vh] md:h-[70vh] flex flex-col">
+        <div className="relative rounded-3xl overflow-hidden shadow-2xl h-[400px] md:h-[500px] flex flex-col">
             {/* 背景图片轮播 */}
             <div className="absolute inset-0 z-0">
                 {backgroundImages.map((src, i) => (

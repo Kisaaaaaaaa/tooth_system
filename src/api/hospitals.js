@@ -1,7 +1,8 @@
 // API wrapper for hospitals endpoints
 // Each function returns parsed JSON when possible, or raw text otherwise.
 
-const API_BASE = ''; // root; change if backend is mounted under a prefix
+// 使用本地mock服务器地址
+const API_BASE = 'http://127.0.0.1:4523/m1/7500990-7236569-6684919';
 
 function handleResponse(res) {
     const ct = res.headers.get('content-type') || '';

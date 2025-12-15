@@ -41,7 +41,7 @@ const Register = ({ navigateTo }) => {
                 if (me) localStorage.setItem('user', JSON.stringify(me));
             } catch (e) {}
             localStorage.removeItem('guest');
-            navigateTo('home');
+            navigateTo('');
         } catch (err) {
             const msg = (err && err.message) ? err.message : JSON.stringify(err);
             setError(msg || '注册失败');
@@ -70,7 +70,7 @@ const Register = ({ navigateTo }) => {
                     <h3 className="text-lg font-medium">注册申请已提交</h3>
                     <p className="mt-2 text-sm text-slate-600">您已提交医生注册申请，系统将在后台审核。审核通过后我们会通知您。医生不需要上传凭证。</p>
                     <div className="mt-4">
-                        <button onClick={() => navigateTo('home')} className="px-4 py-2 bg-cyan-600 text-white rounded">返回首页</button>
+                        <button onClick={() => navigateTo('')} className="px-4 py-2 bg-cyan-600 text-white rounded">返回首页</button>
                     </div>
                 </div>
             ) : (
