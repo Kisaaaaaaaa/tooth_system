@@ -16,6 +16,11 @@ import ThreeDModelPage from './components/pages/ThreeDModelPage';
 import Login from './components/Auth/Login';
 import Register from './components/Auth/Register';
 import UserProfile from './components/pages/UserProfile';
+import DoctorDashboard from './components/doctor/DoctorDashboard';
+import DoctorAppointments from './components/doctor/DoctorAppointments';
+import DoctorRecords from './components/doctor/DoctorRecords';
+import DoctorConsultation from './components/doctor/DoctorConsultation';
+import DoctorProfile from './components/doctor/DoctorProfile';
 import './styles/global.css';
 
 // 路由包装组件，用于传递导航函数
@@ -30,6 +35,21 @@ const AppWithRouter = () => {
         const path = location.pathname;
         if (path === '/') return 'home';
         return path.substring(1);
+    };
+
+    // 检查用户角色
+    const checkUserRole = () => {
+        try {
+            const rawUser = localStorage.getItem('user');
+            const userRole = localStorage.getItem('role');
+            if (rawUser) {
+                const user = JSON.parse(rawUser);
+                return user.role || userRole || null;
+            }
+            return userRole || null;
+        } catch (e) {
+            return localStorage.getItem('role') || null;
+        }
     };
 
     // Router Logic
@@ -58,6 +78,33 @@ const AppWithRouter = () => {
                 <Route path="/" element={<HomePage navigateTo={navigateTo} />} />
                 <Route path="/home" element={<HomePage navigateTo={navigateTo} />} />
                 <Route path="/model3d" element={<ThreeDModelPage navigateTo={navigateTo} />} />
+
+                {/* 医生端路由 */}
+                <Route path="/doctorDashboard" element={
+                    <div className="max-w-7xl mx-auto px-4 md:px-6">
+                        <DoctorDashboard navigateTo={navigateTo} />
+                    </div>
+                } />
+                <Route path="/doctorAppointments" element={
+                    <div className="max-w-7xl mx-auto px-4 md:px-6">
+                        <DoctorAppointments />
+                    </div>
+                } />
+                <Route path="/doctorRecords" element={
+                    <div className="max-w-7xl mx-auto px-4 md:px-6">
+                        <DoctorRecords />
+                    </div>
+                } />
+                <Route path="/doctorConsultation" element={
+                    <div className="max-w-7xl mx-auto px-4 md:px-6">
+                        <DoctorConsultation />
+                    </div>
+                } />
+                <Route path="/doctorProfile" element={
+                    <div className="max-w-7xl mx-auto px-4 md:px-6">
+                        <DoctorProfile />
+                    </div>
+                } />
 
                 {/* 居中容器页面（统一外层容器） */}
                 <Route path="/hospitals" element={
@@ -96,9 +143,24 @@ const AppWithRouter = () => {
                     </div>
                 } />
                 <Route path="/admin" element={
-                    <div className="max-w-7xl mx-auto px-4 md:px-6">
-                        <AdminDashboard />
-                    </div>
+                    checkUserRole() === 'admin' ? (
+                        <div className="max-w-7xl mx-auto px-4 md:px-6">
+                            <AdminDashboard />
+                        </div>
+                    ) : (
+                        <div className="max-w-7xl mx-auto px-4 md:px-6 min-h-screen flex items-center justify-center">
+                            <div className="text-center">
+                                <h2 className="text-2xl font-semibold mb-4">无权访问</h2>
+                                <p className="text-slate-600 mb-6">仅管理员可访问此页面</p>
+                                <button 
+                                    onClick={() => navigateTo('login')}
+                                    className="px-4 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 transition"
+                                >
+                                    返回登录
+                                </button>
+                            </div>
+                        </div>
+                    )
                 } />
                 <Route path="/login" element={
                     <div className="max-w-7xl mx-auto px-4 md:px-6">
