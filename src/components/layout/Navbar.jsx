@@ -3,7 +3,8 @@ import api from '../../api/auth';
 
 // 顶部导航栏组件
 const Navbar = ({ currentPage, navigateTo }) => {
-    const pageLabels = {
+    // 用户端菜单
+    const userPageLabels = {
         'home': '首页',
         'model3d': '3D模型',
         'hospitals': '医院',
@@ -14,43 +15,79 @@ const Navbar = ({ currentPage, navigateTo }) => {
         'aiInquiry': 'AI问询'
     };
 
+    // 医生端菜单
+    const doctorPageLabels = {
+        'doctorDashboard': '仪表板',
+        'doctorAppointments': '预约管理',
+        'doctorRecords': '病例管理',
+        'doctorConsultation': '在线问诊',
+        'doctorProfile': '个人信息'
+    };
+
+    // 管理员菜单
+    const adminPageLabels = {
+        'admin': '管理员面板'
+    };
+
     const [user, setUser] = useState(null);
+    const [role, setRole] = useState(null);
 
     // 检查登录状态
     const checkLoginStatus = () => {
         // 确保localStorage在浏览器环境中可用
         if (typeof localStorage === 'undefined') {
-            console.log('localStorage不可用');
+            console.log('[Navbar] localStorage不可用');
             setUser(null);
+            setRole(null);
             return;
         }
         
         // 同时检查access_token和authToken
         const token = localStorage.getItem('access_token') || localStorage.getItem('authToken');
         const rawUser = localStorage.getItem('user');
+        const userRole = localStorage.getItem('role');
         
-        console.log('检查登录状态:', { token: !!token, user: !!rawUser });
+        console.log('[Navbar] 检查登录状态:', { token: !!token, user: !!rawUser, role: userRole, rawUser });
         
         if (rawUser) {
             try { 
-                const parsedUser = JSON.parse(rawUser);
-                console.log('解析后的用户信息:', parsedUser);
-                setUser(parsedUser); 
+                let parsedUser = JSON.parse(rawUser);
+                console.log('[Navbar] 解析后的用户信息:', parsedUser);
+                
+                // 如果解析出的对象包含 token 字段且有嵌套的 user 对象，则提取真正的 user 对象
+                if (parsedUser.token && parsedUser.user && typeof parsedUser.user === 'object') {
+                    console.log('[Navbar] 检测到嵌套的user对象，提取真正的user');
+                    parsedUser = parsedUser.user;
+                }
+                
+                // 优先使用后端返回的 role，其次才是 localStorage 中保存的 role
+                const finalRole = parsedUser.role || userRole || 'user';
+                console.log('[Navbar] 最终设置的role:', finalRole, '(来自parsedUser.role:', parsedUser.role, ')');
+                setUser(parsedUser);
+                setRole(finalRole);
             } catch (e) {
-                console.error('解析用户信息失败:', e);
+                console.error('[Navbar] 解析用户信息失败:', e);
                 setUser(null);
+                setRole(null);
                 localStorage.removeItem('user');
             }
         } else {
+            console.log('[Navbar] 未找到用户信息，设置为未登录');
             setUser(null);
+            setRole(null);
         }
     };
 
     useEffect(() => {
         // 组件挂载时检查登录状态
+        console.log('[Navbar] 组件挂载，首次检查登录状态');
         checkLoginStatus();
+        
         const onStorage = (e) => {
-            if (!e || e.key === 'user' || e.key === 'authToken' || e.key === 'access_token') {
+            console.log('[Navbar] 检测到 storage/localStorageUpdated 事件:', e.type, e.key);
+            // 自定义事件没有 key 属性，所以需要特别处理
+            if (!e || !e.key || e.key === 'user' || e.key === 'authToken' || e.key === 'access_token' || e.key === 'role' || e.type === 'localStorageUpdated') {
+                console.log('[Navbar] 触发 checkLoginStatus');
                 checkLoginStatus();
             }
         };
@@ -90,6 +127,8 @@ const Navbar = ({ currentPage, navigateTo }) => {
         
         console.log('重置用户状态');
         setUser(null);
+        setRole(null);
+        localStorage.removeItem('role');
         
         console.log('跳转到首页');
         navigateTo('');
@@ -108,15 +147,36 @@ const Navbar = ({ currentPage, navigateTo }) => {
 
                 <div className="flex-1 flex items-center justify-center">
                     <div className="hidden md:flex gap-6 text-sm font-medium text-slate-500 items-center">
-                        {['home', 'model3d', 'hospitals', 'doctors', 'consultation', 'appointment', 'records', 'aiInquiry'].map(page => (
-                            <button
-                                key={page}
-                                onClick={() => navigateTo(page)}
-                                className={`hover:text-cyan-600 transition ${currentPage === page ? 'text-cyan-600 font-bold' : ''}`}
-                            >
-                                {pageLabels[page]}
-                            </button>
-                        ))}
+                        {role === 'admin'
+                            ? Object.entries(adminPageLabels).map(([page, label]) => (
+                                <button
+                                    key={page}
+                                    onClick={() => navigateTo(page)}
+                                    className={`hover:text-cyan-600 transition ${currentPage === page ? 'text-cyan-600 font-bold' : ''}`}
+                                >
+                                    {label}
+                                </button>
+                            ))
+                            : role === 'doctor' 
+                            ? Object.entries(doctorPageLabels).map(([page, label]) => (
+                                <button
+                                    key={page}
+                                    onClick={() => navigateTo(page)}
+                                    className={`hover:text-cyan-600 transition ${currentPage === page ? 'text-cyan-600 font-bold' : ''}`}
+                                >
+                                    {label}
+                                </button>
+                            ))
+                            : ['home', 'model3d', 'hospitals', 'doctors', 'consultation', 'appointment', 'records', 'aiInquiry'].map(page => (
+                                <button
+                                    key={page}
+                                    onClick={() => navigateTo(page)}
+                                    className={`hover:text-cyan-600 transition ${currentPage === page ? 'text-cyan-600 font-bold' : ''}`}
+                                >
+                                    {userPageLabels[page]}
+                                </button>
+                            ))
+                        }
                     </div>
                 </div>
 
@@ -151,8 +211,17 @@ const Navbar = ({ currentPage, navigateTo }) => {
 
                     <div
                         onClick={() => {
-                            if (user) navigateTo('profile');
-                            else navigateTo('login');
+                            if (user) {
+                                if (role === 'admin') {
+                                    navigateTo('admin'); // 管理员点击头像直接跳转到管理面板
+                                } else if (role === 'doctor') {
+                                    navigateTo('doctorDashboard'); // 医生点击头像直接跳转到首页
+                                } else {
+                                    navigateTo('profile');
+                                }
+                            } else {
+                                navigateTo('login');
+                            }
                         }}
                         className="w-8 h-8 rounded-full bg-slate-200 overflow-hidden border border-slate-300 cursor-pointer"
                         title={user ? (user.name || (user.user && user.user.name) || user.phone || (user.user && user.user.phone)) : '登录'}

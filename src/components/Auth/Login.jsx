@@ -229,26 +229,62 @@ const Login = ({ navigateTo }) => {
             } else if (res && res.name) {
                 userObj = res;
             }
+            
+            // 如果 userObj 仍然包含顶层的 token/refresh_token，说明它是响应对象而非真正的 user 对象
+            // 此时应该提取其中的 user 字段
+            if (userObj && userObj.token && userObj.user && typeof userObj.user === 'object') {
+                console.log('检测到响应对象包含嵌套user，提取user对象');
+                userObj = userObj.user;
+            }
+            
             if (userObj) {
                 localStorage.setItem('user', JSON.stringify(userObj));
                 console.log('设置后的user:', localStorage.getItem('user'));
+                console.log('userObj.role:', userObj.role);
+            }
+
+            // 保存 role 字段（用于区分用户和医生）
+            if (userObj && userObj.role) {
+                localStorage.setItem('role', userObj.role);
+                console.log('保存role:', userObj.role);
+            } else {
+                console.log('警告：userObj 中没有 role 字段，无法保存');
             }
 
             localStorage.removeItem('guest');
             console.log('登录流程结束，准备跳转到首页');
-            // 跳转到首页并通知页面其它组件 localStorage 已更新
-            if (typeof navigateTo === 'function') {
-                navigateTo(''); // 跳转到首页（/）
+            console.log('当前 localStorage 状态:', {
+                user: localStorage.getItem('user'),
+                role: localStorage.getItem('role'),
+                authToken: !!localStorage.getItem('authToken')
+            });
+            
+            // 根据 role 判断跳转页面
+            let targetPage = '';
+            if (userObj && userObj.role === 'doctor') {
+                targetPage = 'doctorDashboard';
+            } else if (userObj && userObj.role === 'admin') {
+                targetPage = 'admin';
             } else {
-                window.location.href = '/';
+                targetPage = ''; // 用户端首页
             }
 
-            // 派发自定义事件，便于同一窗口内的组件（如 Navbar）同步状态
+            // 先派发事件通知 Navbar 更新状态
             try {
                 window.dispatchEvent(new Event('localStorageUpdated'));
+                console.log('派发 localStorageUpdated 事件');
             } catch (e) {
-                // ignore
+                console.error('派发事件失败:', e);
             }
+
+            // 延迟跳转，给 Navbar 反应时间
+            setTimeout(() => {
+                if (typeof navigateTo === 'function') {
+                    navigateTo(targetPage);
+                } else {
+                    window.location.href = targetPage ? `/${targetPage}` : '/';
+                }
+            }, 100);
         } catch (err) {
             const msg = (err && err.message) ? err.message : JSON.stringify(err);
             setError(msg || '登录失败');
@@ -311,9 +347,8 @@ const Login = ({ navigateTo }) => {
 
                 <div>
                     <button className="w-full px-4 py-3 bg-cyan-600 text-white rounded-lg shadow-sm">登录</button>
-                    <div className="text-center mt-3 flex flex-col gap-2">
+                    <div className="text-center mt-3">
                         <button type="button" onClick={() => navigateTo('register')} className="text-sm text-cyan-600">没有账号？注册</button>
-                        <button type="button" onClick={() => navigateTo('admin')} className="text-xs text-slate-500 underline hover:text-cyan-600">管理员入口</button>
                     </div>
                 </div>
             </form>
