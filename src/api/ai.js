@@ -1,4 +1,5 @@
-const API_ROOT = 'http://10.83.132.102:8000/api';
+// 使用本地mock服务器地址
+const API_ROOT = 'http://127.0.0.1:4523/m1/7500990-7236569-6684919';
 
 function getAuthHeaders() {
     const h = new Headers();
