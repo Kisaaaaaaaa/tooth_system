@@ -1,8 +1,8 @@
 // API wrapper for hospitals endpoints
 // Each function returns parsed JSON when possible, or raw text otherwise.
 
-// 使用本地mock服务器地址
-const API_BASE = 'http://127.0.0.1:4523/m1/7500990-7236569-6684919';
+// 使用后端API服务器地址
+const API_BASE = 'http://localhost:8000/api';
 
 function handleResponse(res) {
     const ct = res.headers.get('content-type') || '';
@@ -23,7 +23,7 @@ function handleResponse(res) {
 /**
  * 获取医院列表
  * @param {Object} params - 请求参数
- * @param {string} params.filter - 筛选类型，可选值： all（全部）、near（距离最近）、frequent（我常去的），默认 all
+ * @param {string} params.filter - 筛选类型，可选值： all（全部）、near（距离最近）、frequent（大家常去），默认 all
  * @param {number} params.page - 页码，默认 1
  * @param {number} params.page_size - 每页数量，默认 10
  * @param {number} params.latitude - 纬度（用于计算距离，可选）
@@ -44,7 +44,7 @@ export async function getHospitals(params = {}) {
     queryParams.append('filter', filter);
     queryParams.append('page', page);
     queryParams.append('page_size', page_size);
-    
+
     if (latitude) queryParams.append('latitude', latitude);
     if (longitude) queryParams.append('longitude', longitude);
 
@@ -53,7 +53,7 @@ export async function getHospitals(params = {}) {
         redirect: 'follow'
     };
 
-    const res = await fetch(`${API_BASE}/api/hospitals?${queryParams.toString()}`, requestOptions);
+    const res = await fetch(`${API_BASE}/hospitals/?${queryParams.toString()}`, requestOptions);
     return handleResponse(res);
 }
 
@@ -68,7 +68,7 @@ export async function getHospitalDetail(hospital_id) {
         redirect: 'follow'
     };
 
-    const res = await fetch(`${API_BASE}/api/hospitals/${hospital_id}`, requestOptions);
+    const res = await fetch(`${API_BASE}/hospitals/${hospital_id}`, requestOptions);
     return handleResponse(res);
 }
 

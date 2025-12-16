@@ -6,10 +6,39 @@ import { MOCK_HOSPITALS } from '../../data/mockData';
 // 医院概况页面
 const HospitalsPage = ({ navigateTo }) => {
     const [filter, setFilter] = useState('all'); // all, near, frequent
-    const [selectedDistrict, setSelectedDistrict] = useState('all'); // 区域筛选
     const [hospitals, setHospitals] = useState([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
+    const [latitude, setLatitude] = useState(null);
+    const [longitude, setLongitude] = useState(null);
+    const [geolocationError, setGeolocationError] = useState(null);
+
+    // 获取用户地理位置
+    const fetchGeolocation = () => {
+        if (!navigator.geolocation) {
+            setGeolocationError('您的浏览器不支持地理位置服务');
+            return;
+        }
+
+        navigator.geolocation.getCurrentPosition(
+            (position) => {
+                setLatitude(position.coords.latitude);
+                setLongitude(position.coords.longitude);
+                setGeolocationError(null);
+            },
+            (error) => {
+                console.error('获取地理位置失败:', error);
+                setGeolocationError('无法获取您的位置，请检查是否允许访问位置信息');
+            }
+        );
+    };
+
+    // 当选择"距离最近"筛选时，获取用户地理位置
+    useEffect(() => {
+        if (filter === 'near') {
+            fetchGeolocation();
+        }
+    }, [filter]);
 
     // 获取医院数据
     useEffect(() => {
@@ -17,88 +46,76 @@ const HospitalsPage = ({ navigateTo }) => {
             setLoading(true);
             setError(null);
             try {
-                // 这里可以调用真实API，目前先使用mock数据
-                // const response = await hospitalsApi.getHospitals({ filter });
-                // setHospitals(response.data || []);
+                // 构建API请求参数
+                const apiParams = {
+                    filter,
+                    latitude: filter === 'near' ? latitude : undefined,
+                    longitude: filter === 'near' ? longitude : undefined
+                };
 
-                // 使用mock数据，已经包含武汉各区信息
-                setHospitals(MOCK_HOSPITALS);
+                // 调用真实API获取医院数据
+                const response = await hospitalsApi.getHospitals(apiParams);
+                // 确保数据结构正确，根据APIFox文档，医院列表在response.data.results中
+                setHospitals(response.data?.results || []);
             } catch (err) {
-                setError('获取医院列表失败，请稍后重试');
+                // API调用失败时回退到mock数据
+                setError('获取医院列表失败，已使用本地数据');
                 console.error('获取医院列表失败:', err);
+                setHospitals(MOCK_HOSPITALS);
             } finally {
                 setLoading(false);
             }
         };
 
         fetchHospitals();
-    }, [filter]);
+    }, [filter, latitude, longitude]);
 
-    // 筛选医院 - 互斥筛选逻辑
-    // 当选择区域筛选时，忽略"距离最近"和"我常去的"筛选
-    // 当选择"距离最近"或"我常去的"时，忽略区域筛选
+    // 筛选医院
     const filteredHospitals = hospitals.filter(h => {
-        // 区域筛选和特殊筛选（距离最近/我常去的）互斥
-        if (selectedDistrict !== 'all') {
-            // 优先应用区域筛选
-            return h.district === selectedDistrict;
-        } else {
-            // 应用特殊筛选条件
-            if (filter === 'near') return h.tags.includes('最近') || h.distance < 2;
-            if (filter === 'frequent') return h.tags.includes('常去');
+        if (filter === 'near') {
+            // 距离最近筛选：后端返回的数据中没有distance字段，但有latitude和longitude
+            // 只要数据存在就显示，后端会处理距离排序
             return true;
         }
+
+        if (filter === 'frequent') {
+            // 常去的筛选：使用visit_count字段
+            // 对于mock数据，即使没有visit_count字段也显示，后端会正确排序
+            return true;
+        }
+
+        return true;
     });
 
-    // 获取所有区域（用于筛选）
-    const districts = ['all', ...Array.from(new Set(hospitals.map(h => h.district))).sort((a, b) => a.localeCompare(b, 'zh-CN'))];
+
 
     return (
         <div className="space-y-4 animate-fade-in">
             {/* 筛选条件区域 - 响应式布局 */}
-            <div className="space-y-3">
-                {/* 区域筛选 - 武汉各区（可横向滚动） */}
-                <div className="relative">
-                    <div className="flex gap-2 overflow-x-auto pb-1 max-w-full scrollbar-hide">
-                        {districts.map(district => (
-                            <button
-                                key={district}
-                                onClick={() => {
-                                    setSelectedDistrict(district);
-                                    // 选择区域筛选时，重置特殊筛选
-                                    if (district !== 'all') {
-                                        setFilter('all');
-                                    }
-                                }}
-                                className={`px-3 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-all ${selectedDistrict === district ? 'bg-cyan-500 text-white shadow-sm' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}
-                                    `}
-                                style={{ minWidth: '60px' }}
-                            >
-                                {district === 'all' ? '全部' : district}
-                            </button>
-                        ))}
-                    </div>
-                    {/* 渐变遮罩，提示可滚动 */}
-                    <div className="absolute right-0 top-0 bottom-2 w-8 bg-gradient-to-l from-white to-transparent pointer-events-none"></div>
-                </div>
-
-                {/* 额外筛选条件 - 始终保持在区域筛选下方 */}
+            <div className="space-y-3 pt-4">
+                {/* 筛选条件 */}
                 <div className="flex gap-2 justify-start">
-                    {['near', 'frequent'].map(f => (
+                    {['all', 'near', 'frequent'].map(f => (
                         <button
                             key={f}
                             onClick={() => {
                                 setFilter(f);
-                                // 选择特殊筛选时，重置区域筛选
-                                setSelectedDistrict('all');
                             }}
                             className={`px-4 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-all ${filter === f ? 'bg-cyan-500 text-white shadow-sm' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                                 }`}
                         >
-                            {f === 'near' ? '距离最近' : '我常去的'}
+                            {f === 'all' ? '全部' : f === 'near' ? '距离最近' : '大家常去'}
                         </button>
                     ))}
                 </div>
+
+                {/* 地理位置错误提示 */}
+                {(error || geolocationError) && (
+                    <div className="bg-red-50 text-red-600 p-3 rounded-lg text-sm">
+                        {error}
+                        {geolocationError && <>{error ? ' ' : ''}{geolocationError}</>}
+                    </div>
+                )}
             </div>
 
             {/* 医院列表 - 一排三个 */}
