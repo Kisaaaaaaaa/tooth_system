@@ -1,8 +1,8 @@
 // API wrapper for statistics endpoints
 // Each function returns parsed JSON when possible, or raw text otherwise.
 
-// 使用本地mock服务器地址
-const API_BASE = 'http://127.0.0.1:4523/m1/7500990-7236569-6684919'; // root; change if backend is mounted under a prefix
+// 使用后端API服务器地址
+const API_BASE = 'http://localhost:8000/api';
 
 function handleResponse(res) {
   const ct = res.headers.get('content-type') || '';
@@ -12,15 +12,15 @@ function handleResponse(res) {
       return res.json().then(j => {
         // 尝试解析错误信息，提取用户友好的提示
         let errorMessage = '';
-        
+
         if (j.message) {
           try {
             const messageStr = j.message;
             const errors = [];
-            
+
             // 直接使用正则表达式提取所有中文错误信息
             const errorMatches = messageStr.match(/'([^']*[\u4e00-\u9fa5]+[^']*)'/g);
-            
+
             if (errorMatches) {
               // 移除引号并将所有错误信息合并
               errorMatches.forEach(match => {
@@ -38,12 +38,12 @@ function handleResponse(res) {
         } else if (typeof j === 'string') {
           errorMessage = j;
         }
-        
+
         // 如果没有提取到错误信息，使用默认的错误提示
         if (!errorMessage) {
           errorMessage = `${res.status} ${res.statusText}`;
         }
-        
+
         throw new Error(errorMessage);
       });
     }
@@ -70,32 +70,32 @@ function handleResponse(res) {
  * }
  */
 export async function getHomeStatistics() {
-    try {
-        const requestOptions = {
-            method: 'GET',
-            redirect: 'follow'
-        };
-        const res = await fetch(`${API_BASE}/statistics/home`, requestOptions);
-        return handleResponse(res);
-    } catch (error) {
-        console.error('获取首页统计数据失败:', error);
-        // 如果mock服务器无法响应，返回默认数据
-        return {
-            code: 200,
-            message: "使用默认统计数据",
-            data: {
-                cooperation_clinics: 2000,
-                appointment_efficiency: 98,
-                revenue_growth: 45,
-                patient_satisfaction: 95,
-                today_patients: 128,
-                online_doctors: 12
-            }
-        };
-    }
+  try {
+    const requestOptions = {
+      method: 'GET',
+      redirect: 'follow'
+    };
+    const res = await fetch(`${API_BASE}/statistics/home/`, requestOptions);
+    return handleResponse(res);
+  } catch (error) {
+    console.error('获取首页统计数据失败:', error);
+    // 如果mock服务器无法响应，返回默认数据
+    return {
+      code: 200,
+      message: "使用默认统计数据",
+      data: {
+        cooperation_clinics: 2000,
+        appointment_efficiency: 98,
+        revenue_growth: 45,
+        patient_satisfaction: 95,
+        today_patients: 128,
+        online_doctors: 12
+      }
+    };
+  }
 }
 
 export default {
-    getHomeStatistics,
+  getHomeStatistics,
 };
 

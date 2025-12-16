@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
-import { BrowserRouter as Router, Routes, Route, Link, useNavigate, useLocation } from 'react-router-dom';
-import { ArrowLeft } from 'lucide-react';
+import { BrowserRouter as Router, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import Navbar from './components/layout/Navbar';
 import BottomNav from './components/layout/BottomNav';
 import HomePage from './components/pages/HomePage';
@@ -23,7 +22,9 @@ const AppWithRouter = () => {
     const navigate = useNavigate();
     const location = useLocation();
     const [selectedDoctor, setSelectedDoctor] = useState(null);
-    const [selectedHospitalId, setSelectedHospitalId] = useState(null);
+    const [showLoginModal, setShowLoginModal] = useState(false);
+    const [loginTip, setLoginTip] = useState('');
+    const REQUIRE_CONSULTATION_AUTH = true; // 预留开关，后续可开启问诊登录校验
 
     // 获取当前页面名称
     const getCurrentPage = () => {
@@ -32,19 +33,49 @@ const AppWithRouter = () => {
         return path.substring(1);
     };
 
+    // 简单登录检测
+    const isAuthed = () => {
+        return !!(localStorage.getItem('access_token') || localStorage.getItem('authToken'));
+    };
+
     // Router Logic
     const navigateTo = (page, params = {}) => {
-        if (params.hospitalId) {
-            setSelectedHospitalId(params.hospitalId);
-        }
         window.scrollTo({ top: 0, behavior: 'smooth' });
+
+        // 跳医院详情时直接带上参数到路由，避免刷新丢状态
+        if (page === 'hospitalDetail' && params.hospitalId) {
+            navigate(`/hospitalDetail/${params.hospitalId}`);
+            return;
+        }
+
         // 如果page为空字符串，直接导航到根路径'/'
         navigate(page ? `/${page}` : '/');
     };
 
     const startConsultation = (doctor) => {
+        const targetDoctor = doctor || selectedDoctor;
+        const doctorId = targetDoctor?.id;
+
+        if (REQUIRE_CONSULTATION_AUTH && !isAuthed()) {
+            setLoginTip('登录后才能进行在线咨询');
+            setShowLoginModal(true);
+            return;
+        }
+
+        setSelectedDoctor(targetDoctor || null);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        const search = doctorId ? `?doctorId=${doctorId}` : '';
+        navigate(`/consultation${search}`, { state: { doctor: targetDoctor } });
+    };
+
+    const startAppointment = (doctor) => {
+        if (!isAuthed()) {
+            setLoginTip('登录后才能预约挂号');
+            setShowLoginModal(true);
+            return;
+        }
         setSelectedDoctor(doctor);
-        navigateTo('consultation');
+        navigateTo('appointment');
     };
 
     return (
@@ -65,19 +96,29 @@ const AppWithRouter = () => {
                         <HospitalsPage navigateTo={navigateTo} />
                     </div>
                 } />
+                <Route path="/hospitalDetail/:hospitalId" element={
+                    <div className="max-w-7xl mx-auto px-4 md:px-6">
+                        <HospitalDetailPage navigateTo={navigateTo} startConsultation={startConsultation} startAppointment={startAppointment} />
+                    </div>
+                } />
+                {/* 兼容旧路径，可能没有参数 */}
                 <Route path="/hospitalDetail" element={
                     <div className="max-w-7xl mx-auto px-4 md:px-6">
-                        <HospitalDetailPage navigateTo={navigateTo} hospitalId={selectedHospitalId} />
+                        <HospitalDetailPage navigateTo={navigateTo} startConsultation={startConsultation} startAppointment={startAppointment} />
                     </div>
                 } />
                 <Route path="/doctors" element={
                     <div className="max-w-7xl mx-auto px-4 md:px-6">
-                        <DoctorsPage navigateTo={navigateTo} startConsultation={startConsultation} />
+                        <DoctorsPage navigateTo={navigateTo} startConsultation={startConsultation} startAppointment={startAppointment} />
                     </div>
                 } />
                 <Route path="/consultation" element={
                     <div className="max-w-7xl mx-auto px-4 md:px-6">
-                        <ConsultationPage currentDoctor={selectedDoctor} />
+                        <ConsultationPage
+                            currentDoctor={selectedDoctor}
+                            consultationAuthRequired={REQUIRE_CONSULTATION_AUTH}
+                            isAuthed={isAuthed}
+                        />
                     </div>
                 } />
                 <Route path="/appointment" element={
@@ -119,6 +160,33 @@ const AppWithRouter = () => {
 
             {/* 移动端底部导航 */}
             <BottomNav currentPage={getCurrentPage()} navigateTo={navigateTo} />
+
+            {/* 未登录提示弹窗 */}
+            {showLoginModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+                    <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6">
+                        <h3 className="text-lg font-bold text-slate-800 mb-3">需要登录</h3>
+                        <p className="text-slate-600 mb-6">{loginTip || '您还未登录，暂时无法使用该功能。'}</p>
+                        <div className="flex gap-3">
+                            <button
+                                onClick={() => setShowLoginModal(false)}
+                                className="flex-1 py-2.5 rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50 transition"
+                            >
+                                取消
+                            </button>
+                            <button
+                                onClick={() => {
+                                    setShowLoginModal(false);
+                                    navigateTo('login');
+                                }}
+                                className="flex-1 py-2.5 rounded-lg bg-cyan-500 text-white hover:bg-cyan-600 transition shadow-sm"
+                            >
+                                去登录
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
