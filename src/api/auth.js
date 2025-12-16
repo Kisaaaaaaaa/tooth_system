@@ -120,7 +120,7 @@ export async function login({ phone, password, captcha_id, captcha }) {
   
   try {
     const res = await fetch(`${MOCK_BASE}/auth/login/`, requestOptions);
-    return handleResponse(res);
+    return await handleResponse(res);
   } catch (error) {
     // 如果mock服务器无法响应，使用本地模拟数据
     console.log('Mock服务器登录端点不可用，使用本地模拟数据', error);
@@ -134,10 +134,22 @@ export async function login({ phone, password, captcha_id, captcha }) {
     }
     
     // 生成模拟的用户数据
+    let role = 'user';
+    let name = '模拟用户';
+    
+    // 根据手机号判断角色
+    if (phone === 'admin' || phone === '13800000001') {
+      role = 'admin';
+      name = '管理员';
+    } else if (phone === 'doctor' || phone === '13800000002') {
+      role = 'doctor';
+      name = '医生';
+    }
+    
     const mockUser = {
       id: Math.floor(Math.random() * 1000000),
-      role: phone === 'admin' ? 'admin' : 'user', // 如果手机号是admin，模拟管理员角色
-      name: phone === 'admin' ? '管理员' : '模拟用户',
+      role,
+      name,
       phone,
       // 模拟的token数据
       access: 'mock_access_token_' + Math.random().toString(36).substr(2, 9),
@@ -167,7 +179,7 @@ export async function register({ role, name, phone, password }) {
   
   try {
     const res = await fetch(`${MOCK_BASE}/auth/register/`, requestOptions);
-    return handleResponse(res);
+    return await handleResponse(res);
   } catch (error) {
     // 如果mock服务器无法响应，使用本地模拟数据
     console.log('Mock服务器注册端点不可用，使用本地模拟数据', error);
@@ -251,6 +263,7 @@ export async function logout() {
     localStorage.removeItem('authToken');
     localStorage.removeItem('refresh_token');
     localStorage.removeItem('user'); // 如果你还存了用户信息，顺便删了
+    localStorage.removeItem('role'); // 清除角色字段
     
     // 返回一个假装成功的消息，防止 Navbar.jsx 报错
     return { message: "Logged out successfully" };
@@ -263,7 +276,7 @@ export async function me() {
     if (token) myHeaders.append('Authorization', `Bearer ${token}`);
     const requestOptions = { method: 'GET', headers: myHeaders, redirect: 'follow' };
     const res = await fetch(`${MOCK_BASE}/auth/me/`, requestOptions);
-    return handleResponse(res);
+    return await handleResponse(res);
   } catch (error) {
     console.error('获取用户信息失败:', error);
     // 如果mock服务器无法响应，从localStorage获取用户信息
@@ -288,7 +301,7 @@ export async function updateMe({ name, avatar }) {
   const body = JSON.stringify({ name, avatar });
   const requestOptions = { method: 'PUT', headers: myHeaders, body, redirect: 'follow' };
   const res = await fetch(`${MOCK_BASE}/auth/me/`, requestOptions);
-  return handleResponse(res);
+  return await handleResponse(res);
 }
 
 export async function changePassword({ old_password, new_password }) {
@@ -299,7 +312,7 @@ export async function changePassword({ old_password, new_password }) {
   const body = JSON.stringify({ old_password, new_password });
   const requestOptions = { method: 'POST', headers: myHeaders, body, redirect: 'follow' };
   const res = await fetch(`${MOCK_BASE}/auth/change-password/`, requestOptions);
-  return handleResponse(res);
+  return await handleResponse(res);
 }
 
 // === Profile helpers against mock endpoints ===
@@ -311,7 +324,7 @@ export async function sendEmailCode({ email }) {
   const body = JSON.stringify({ email });
   const requestOptions = { method: 'POST', headers: myHeaders, body, redirect: 'follow' };
   const res = await fetch(`${MOCK_BASE}/auth/send-email-code/`, requestOptions);
-  return handleResponse(res);
+  return await handleResponse(res);
 }
 
 export async function updateProfile({ name, avatar, email }) {
@@ -322,7 +335,7 @@ export async function updateProfile({ name, avatar, email }) {
   const body = JSON.stringify({ name, avatar, email });
   const requestOptions = { method: 'PATCH', headers: myHeaders, body, redirect: 'follow' };
   const res = await fetch(`${MOCK_BASE}/auth/me/`, requestOptions);
-  return handleResponse(res);
+  return await handleResponse(res);
 }
 
 export async function changePasswordWithCode({ old_password, new_password, email, code }) {
@@ -333,7 +346,55 @@ export async function changePasswordWithCode({ old_password, new_password, email
   const body = JSON.stringify({ old_password, new_password, email, code });
   const requestOptions = { method: 'POST', headers: myHeaders, body, redirect: 'follow' };
   const res = await fetch(`${MOCK_BASE}/auth/change-password/`, requestOptions);
-  return handleResponse(res);
+  return await handleResponse(res);
+}
+
+export async function sendVerificationCode(email) {
+  // 此函数用于发送邮箱验证码（修改邮箱或密码）
+  const myHeaders = new Headers();
+  myHeaders.append('Content-Type', 'application/json');
+  const token = localStorage.getItem('access_token') || localStorage.getItem('authToken');
+  if (token) myHeaders.append('Authorization', `Bearer ${token}`);
+  const body = JSON.stringify({ email });
+  const requestOptions = { method: 'POST', headers: myHeaders, body, redirect: 'follow' };
+  
+  // 优先使用Mock API (本地开发快速获取)，失败时使用真实API
+  try {
+    console.log('使用Mock API发送验证码...');
+    const res = await fetch(`${MOCK_BASE}/auth/send-email-code/`, requestOptions);
+    return await handleResponse(res);
+  } catch (e) {
+    console.warn('Mock API失败，尝试真实API:', e);
+    try {
+      const res = await fetch(`${API_BASE}/auth/send-verification-code/`, requestOptions);
+      return await handleResponse(res);
+    } catch (e2) {
+      console.error('两个API都失败:', e2);
+      throw e2;
+    }
+  }
+}
+
+export async function verifyEmailAndUpdate(data) {
+  // 此函数用于验证邮箱码并更新信息（邮箱或密码）
+  // data 包含: email, code, password (可选)
+  const myHeaders = new Headers();
+  myHeaders.append('Content-Type', 'application/json');
+  const token = localStorage.getItem('access_token') || localStorage.getItem('authToken');
+  if (token) myHeaders.append('Authorization', `Bearer ${token}`);
+  const body = JSON.stringify(data);
+  const requestOptions = { method: 'POST', headers: myHeaders, body, redirect: 'follow' };
+  
+  console.log('验证邮箱码请求:', {
+    endpoint: `${MOCK_BASE}/auth/verify-email/`,
+    data: data,
+    hasToken: !!token
+  });
+  
+  // 已被 changePasswordWithCode 取代，直接使用本地Mock
+  console.log('使用Mock API验证邮箱码...');
+  const res = await fetch(`${MOCK_BASE}/auth/verify-email/`, requestOptions);
+  return await handleResponse(res);
 }
 
 export default {
@@ -348,4 +409,6 @@ export default {
   sendEmailCode,
   updateProfile,
   changePasswordWithCode,
+  sendVerificationCode,
+  verifyEmailAndUpdate,
 };

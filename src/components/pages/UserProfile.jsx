@@ -131,9 +131,8 @@ const UserProfile = () => {
       setLoading(true);
       await api.changePasswordWithCode({ old_password: oldPwd, new_password: newPwd, email: profile.email, code: emailCode });
       setMessage('密码已修改，正在跳转首页...');
-      setTimeout(() => {
-        navigate('/');
-      }, 1200);
+      // 直接跳转到首页
+      navigate('/');
       setOldPwd(''); setNewPwd(''); setEmailCode('');
     } catch (e) {
       setError(e.message || '修改密码失败');

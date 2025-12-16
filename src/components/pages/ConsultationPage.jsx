@@ -7,7 +7,11 @@ import hospitalsApi from '../../api/hospitals';
 import { MOCK_HOSPITALS, MOCK_CONSULTATION_HISTORIES } from '../../data/mockData';
 
 // 在线问诊页面
-const ConsultationPage = ({ currentDoctor, consultationAuthRequired = false, isAuthed = () => true }) => {
+const ConsultationPage = ({ currentDoctor, consultationAuthRequired = false }) => {
+    // 简单登录检测
+    const isAuthed = () => {
+        return !!(localStorage.getItem('access_token') || localStorage.getItem('authToken'));
+    };
     const location = useLocation();
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
