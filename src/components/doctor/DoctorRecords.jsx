@@ -6,7 +6,7 @@ const DoctorRecords = () => {
     const [records, setRecords] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
-    const [showForm, setShowForm] = useState(false);
+    const [showEditModal, setShowEditModal] = useState(false);
     const [editingId, setEditingId] = useState(null);
     const [currentPage, setCurrentPage] = useState(1);
     const [pageSize, setPageSize] = useState(10);
@@ -14,7 +14,6 @@ const DoctorRecords = () => {
     // 搜索和过滤参数
     const [searchFilters, setSearchFilters] = useState({
         patient_name: '',
-        doctor_name: '',
         date_from: '',
         date_to: '',
         patient_id: ''
@@ -22,8 +21,10 @@ const DoctorRecords = () => {
     const [showFilters, setShowFilters] = useState(false);
     
     const [formData, setFormData] = useState({
+        patient_name: '',
         user_id: '',
         hospital_id: '',
+        doctor_id: '',
         date: new Date().toISOString().split('T')[0],
         diagnosis: '',
         content: '',
@@ -32,10 +33,66 @@ const DoctorRecords = () => {
         result_image: ''
     });
     const [medicationInput, setMedicationInput] = useState('');
+    const [doctorInfo, setDoctorInfo] = useState({ doctor_id: '', hospital_id: '', hospital_name: '' });
+    const [patientIndex, setPatientIndex] = useState({});
 
     useEffect(() => {
+        fetchDoctorDefaults();
+        fetchPatientIndex();
         fetchRecords();
     }, [currentPage, pageSize]);
+
+    // 统一补全名称字段，兼容后端返回的 id/name 组合
+    const normalizeRecords = (arr = []) =>
+        arr.map(r => ({
+            ...r,
+            patient_name: r.patient_name || r.user_name || r.name || '未知患者',
+            doctor_name: r.doctor_name || r.doctor?.name || '主诊医生',
+            hospital_name: r.hospital_name || r.hospital?.name || '未填写医院'
+        }));
+
+    // 医生/医院默认值
+    const fetchDoctorDefaults = async () => {
+        try {
+            const me = await doctorApi.getDoctorMe();
+            const doctor_id = me?.id || me?.doctor_id || '';
+            const hospital_id = me?.hospital_id || me?.hospital?.id || '';
+            const hospital_name = me?.hospital_name || me?.hospital?.name || '';
+            setDoctorInfo({ doctor_id, hospital_id, hospital_name });
+            setFormData(prev => ({ ...prev, doctor_id, hospital_id }));
+        } catch (e) {
+            console.warn('获取医生默认信息失败:', e);
+        }
+    };
+
+    // 建立患者名字到ID的索引（从预约列表中抓取）
+    const fetchPatientIndex = async () => {
+        try {
+            const res = await doctorApi.getAppointments();
+            const payload = res?.data?.results || res?.results || res?.data || res;
+            if (Array.isArray(payload)) {
+                const idx = {};
+                payload.forEach(item => {
+                    const name = item.patient_name || item.user_name || item.name;
+                    const uid = item.user_id;
+                    if (name && uid) {
+                        idx[name] = uid;
+                    }
+                });
+                setPatientIndex(idx);
+            }
+        } catch (e) {
+            console.warn('获取预约以索引患者失败:', e);
+        }
+    };
+
+    const resolvePatientId = (name) => {
+        if (!name) return '';
+        if (patientIndex[name]) return patientIndex[name];
+        // 尝试从已加载的病例中反查
+        const fromRecords = records.find(r => r.patient_name === name && r.user_id);
+        return fromRecords?.user_id || '';
+    };
 
     const fetchRecords = async () => {
         try {
@@ -52,17 +109,17 @@ const DoctorRecords = () => {
             if (res && res.data) {
                 // 处理分页对象格式：{count, page, page_size, results}
                 if (Array.isArray(res.data)) {
-                    setRecords(res.data);
+                    setRecords(normalizeRecords(res.data));
                 } else if (res.data.results && Array.isArray(res.data.results)) {
-                    setRecords(res.data.results);
+                    setRecords(normalizeRecords(res.data.results));
                 } else {
                     setRecords([]);
                 }
             } else if (Array.isArray(res)) {
-                setRecords(res);
+                setRecords(normalizeRecords(res));
             } else {
                 // 使用模拟数据
-                setRecords([
+                setRecords(normalizeRecords([
                     {
                         id: 1,
                         patient_name: '张三',
@@ -71,7 +128,7 @@ const DoctorRecords = () => {
                         treatment: '充填',
                         status: 'completed'
                     }
-                ]);
+                ]));
             }
         } catch (err) {
             console.error('获取病例列表失败:', err);
@@ -98,7 +155,6 @@ const DoctorRecords = () => {
     const handleClearFilters = () => {
         setSearchFilters({
             patient_name: '',
-            doctor_name: '',
             date_from: '',
             date_to: '',
             patient_id: ''
@@ -129,11 +185,32 @@ const DoctorRecords = () => {
             ...prev,
             [name]: value
         }));
+
+        if (name === 'patient_name') {
+            const resolved = resolvePatientId(value.trim());
+            if (resolved) {
+                setFormData(prev => ({ ...prev, user_id: resolved, patient_name: value }));
+            }
+        }
     };
 
     const handleSubmitForm = async () => {
-        if (!formData.user_id || !formData.diagnosis || !formData.treatment) {
-            setError('请填写必要字段');
+        const payload = { ...formData };
+        if (!payload.user_id) {
+            payload.user_id = resolvePatientId(payload.patient_name);
+        }
+        if (!payload.user_id) {
+            setError('未找到该患者ID，请先通过预约或让管理员提供患者ID');
+            return;
+        }
+        payload.doctor_id = payload.doctor_id || doctorInfo.doctor_id;
+        payload.hospital_id = payload.hospital_id || doctorInfo.hospital_id;
+        if (!payload.doctor_id || !payload.hospital_id) {
+            setError('缺少医生或医院信息，请刷新页面重试');
+            return;
+        }
+        if (!payload.diagnosis || !payload.treatment) {
+            setError('请填写诊断和治疗方案');
             return;
         }
 
@@ -163,19 +240,18 @@ const DoctorRecords = () => {
                 alert('病例已成功更新！');
             } else {
                 // 创建病例
-                const res = await doctorApi.createRecord(formData);
+                const res = await doctorApi.createRecord(payload);
                 console.log('创建病例响应:', res);
                 
                 if (res && res.data) {
-                    setRecords(prev => [...prev, res.data]);
+                    setRecords(prev => [...prev, normalizeRecords([res.data])[0]]);
                 } else {
-                    setRecords(prev => [...prev, { id: Date.now(), ...formData }]);
+                    setRecords(prev => [...prev, normalizeRecords([{ id: Date.now(), ...payload }])[0]]);
                 }
                 setError(null);
                 alert('病例已成功创建！');
             }
             resetForm();
-            setShowForm(false);
         } catch (err) {
             console.error('保存病例失败:', err);
             setError(editingId ? '更新病例失败' : '创建病例失败');
@@ -186,8 +262,10 @@ const DoctorRecords = () => {
 
     const resetForm = () => {
         setFormData({
+            patient_name: '',
             user_id: '',
-            hospital_id: '',
+            hospital_id: doctorInfo.hospital_id || '',
+            doctor_id: doctorInfo.doctor_id || '',
             date: new Date().toISOString().split('T')[0],
             diagnosis: '',
             content: '',
@@ -197,12 +275,24 @@ const DoctorRecords = () => {
         });
         setMedicationInput('');
         setEditingId(null);
+        setShowEditModal(false);
     };
 
     const handleEditRecord = (record) => {
-        setFormData(record);
+        setFormData({
+            patient_name: record.patient_name,
+            user_id: record.user_id || '',
+            hospital_id: record.hospital_id || doctorInfo.hospital_id,
+            doctor_id: record.doctor_id || doctorInfo.doctor_id,
+            date: record.date,
+            diagnosis: record.diagnosis,
+            content: record.content,
+            treatment: record.treatment,
+            medications: record.medications || [],
+            result_image: record.result_image || ''
+        });
         setEditingId(record.id);
-        setShowForm(true);
+        setShowEditModal(true);
     };
 
     const handleDeleteRecord = async (recordId) => {
@@ -232,100 +322,87 @@ const DoctorRecords = () => {
             <div className="flex items-center justify-between">
                 <h1 className="text-2xl font-bold text-slate-800">病例管理</h1>
                 <div className="flex gap-2">
-                    {!showForm && (
-                        <>
-                            <button
-                                onClick={() => setShowFilters(!showFilters)}
-                                className="flex items-center gap-2 px-4 py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition"
-                            >
-                                <Filter size={18} />
-                                筛选
-                            </button>
-                            <button
-                                onClick={() => {
-                                    resetForm();
-                                    setEditingId(null);
-                                    setShowForm(true);
-                                }}
-                                className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition"
-                            >
-                                <Plus size={18} />
-                                新建病例
-                            </button>
-                        </>
-                    )}
+                    <button
+                        onClick={() => setShowFilters(!showFilters)}
+                        className="flex items-center gap-2 px-4 py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition"
+                    >
+                        <Filter size={18} />
+                        筛选
+                    </button>
+                    <button
+                        onClick={() => {
+                            resetForm();
+                            setEditingId(null);
+                            setShowEditModal(true);
+                        }}
+                        className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition"
+                    >
+                        <Plus size={18} />
+                        新建病例
+                    </button>
                 </div>
             </div>
 
             {/* 搜索和过滤区域 */}
-            {showFilters && !showForm && (
-                <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-1">患者名字</label>
-                            <input
-                                type="text"
-                                name="patient_name"
-                                value={searchFilters.patient_name}
-                                onChange={handleSearchFilterChange}
-                                placeholder="输入患者名字"
-                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            />
+            {showFilters && (
+                <div className="bg-white rounded-xl shadow-sm p-6 border border-slate-200">
+                    <div className="space-y-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 mb-2">患者名字</label>
+                                <input
+                                    type="text"
+                                    name="patient_name"
+                                    value={searchFilters.patient_name}
+                                    onChange={handleSearchFilterChange}
+                                    placeholder="输入患者名字"
+                                    className="w-full px-3 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 mb-2">患者ID</label>
+                                <input
+                                    type="text"
+                                    name="patient_id"
+                                    value={searchFilters.patient_id}
+                                    onChange={handleSearchFilterChange}
+                                    placeholder="输入患者ID"
+                                    className="w-full px-3 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 mb-2">开始日期</label>
+                                <input
+                                    type="date"
+                                    name="date_from"
+                                    value={searchFilters.date_from}
+                                    onChange={handleSearchFilterChange}
+                                    className="w-full px-3 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 mb-2">结束日期</label>
+                                <input
+                                    type="date"
+                                    name="date_to"
+                                    value={searchFilters.date_to}
+                                    onChange={handleSearchFilterChange}
+                                    className="w-full px-3 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
+                                />
+                            </div>
                         </div>
-                        <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-1">医生名字</label>
-                            <input
-                                type="text"
-                                name="doctor_name"
-                                value={searchFilters.doctor_name}
-                                onChange={handleSearchFilterChange}
-                                placeholder="输入医生名字"
-                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            />
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-1">患者ID</label>
-                            <input
-                                type="text"
-                                name="patient_id"
-                                value={searchFilters.patient_id}
-                                onChange={handleSearchFilterChange}
-                                placeholder="输入患者ID"
-                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            />
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-1">开始日期</label>
-                            <input
-                                type="date"
-                                name="date_from"
-                                value={searchFilters.date_from}
-                                onChange={handleSearchFilterChange}
-                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            />
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-1">结束日期</label>
-                            <input
-                                type="date"
-                                name="date_to"
-                                value={searchFilters.date_to}
-                                onChange={handleSearchFilterChange}
-                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            />
-                        </div>
-                        <div className="flex items-end gap-2">
-                            <button
-                                onClick={handleApplyFilters}
-                                className="flex-1 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition"
-                            >
-                                搜索
-                            </button>
+                        <div className="flex justify-end gap-3 pt-2">
                             <button
                                 onClick={handleClearFilters}
-                                className="flex-1 px-4 py-2 bg-slate-300 text-slate-700 rounded-lg hover:bg-slate-400 transition"
+                                className="px-6 py-2.5 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition font-medium"
                             >
                                 清空
+                            </button>
+                            <button
+                                onClick={handleApplyFilters}
+                                className="px-6 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium shadow-sm"
+                            >
+                                搜索
                             </button>
                         </div>
                     </div>
@@ -339,163 +416,7 @@ const DoctorRecords = () => {
                 </div>
             )}
 
-            {/* 新建/编辑表单 */}
-            {showForm && (
-                <div className="bg-white rounded-xl shadow-md p-6 border border-slate-100">
-                    <h2 className="text-xl font-bold text-slate-800 mb-4">
-                        {editingId ? '编辑病例' : '新建病例'}
-                    </h2>
-                    <div className="space-y-4">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-1">患者ID</label>
-                                <input
-                                    type="text"
-                                    name="user_id"
-                                    value={formData.user_id}
-                                    onChange={handleFormChange}
-                                    placeholder="请输入患者ID"
-                                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                    required
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-1">医院ID</label>
-                                <input
-                                    type="text"
-                                    name="hospital_id"
-                                    value={formData.hospital_id}
-                                    onChange={handleFormChange}
-                                    placeholder="请输入医院ID"
-                                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                />
-                            </div>
-                        </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-1">就诊日期</label>
-                                <input
-                                    type="date"
-                                    name="date"
-                                    value={formData.date}
-                                    onChange={handleFormChange}
-                                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-1">诊断</label>
-                                <input
-                                    type="text"
-                                    name="diagnosis"
-                                    value={formData.diagnosis}
-                                    onChange={handleFormChange}
-                                    placeholder="请输入诊断"
-                                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                    required
-                                />
-                            </div>
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-1">治疗方案</label>
-                            <textarea
-                                name="treatment"
-                                value={formData.treatment}
-                                onChange={handleFormChange}
-                                placeholder="请输入治疗方案"
-                                rows="3"
-                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                required
-                            />
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-1">病情内容</label>
-                            <textarea
-                                name="content"
-                                value={formData.content}
-                                onChange={handleFormChange}
-                                placeholder="请输入详细病情"
-                                rows="3"
-                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            />
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-2">用药</label>
-                            <div className="flex gap-2 mb-2">
-                                <input
-                                    type="text"
-                                    value={medicationInput}
-                                    onChange={(e) => setMedicationInput(e.target.value)}
-                                    onKeyPress={(e) => {
-                                        if (e.key === 'Enter') {
-                                            e.preventDefault();
-                                            handleAddMedication();
-                                        }
-                                    }}
-                                    placeholder="输入药物名称后回车添加"
-                                    className="flex-1 px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                />
-                                <button
-                                    onClick={handleAddMedication}
-                                    className="px-4 py-2 bg-slate-200 text-slate-700 rounded-lg hover:bg-slate-300 transition"
-                                >
-                                    添加
-                                </button>
-                            </div>
-                            <div className="flex flex-wrap gap-2">
-                                {formData.medications.map((med, idx) => (
-                                    <div
-                                        key={idx}
-                                        className="flex items-center gap-2 px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm"
-                                    >
-                                        {med}
-                                        <button
-                                            onClick={() => handleRemoveMedication(idx)}
-                                            className="hover:opacity-70"
-                                        >
-                                            <X size={14} />
-                                        </button>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-1">检查图片URL</label>
-                            <input
-                                type="text"
-                                name="result_image"
-                                value={formData.result_image}
-                                onChange={handleFormChange}
-                                placeholder="请输入检查图片URL"
-                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            />
-                        </div>
-
-                        <div className="flex gap-2 justify-end">
-                            <button
-                                onClick={() => {
-                                    resetForm();
-                                    setShowForm(false);
-                                }}
-                                className="px-4 py-2 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition"
-                            >
-                                取消
-                            </button>
-                            <button
-                                onClick={handleSubmitForm}
-                                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
-                            >
-                                <Save size={18} />
-                                保存病例
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
 
             {/* 病例列表 */}
             <div className="space-y-3">
@@ -509,8 +430,10 @@ const DoctorRecords = () => {
                         <div key={record.id} className="bg-white rounded-xl shadow-sm p-6 border border-slate-100 hover:shadow-md transition">
                             <div className="flex items-start justify-between">
                                 <div className="flex-1">
-                                    <h3 className="text-lg font-bold text-slate-800">{record.patient_name || `患者 #${record.user_id}`}</h3>
+                                    <h3 className="text-lg font-bold text-slate-800">{record.patient_name}</h3>
                                     <div className="grid grid-cols-2 gap-2 mt-3 text-sm text-slate-600">
+                                        <p><span className="font-medium">医院:</span> {record.hospital_name}</p>
+                                        <p><span className="font-medium">医生:</span> {record.doctor_name}</p>
                                         <p><span className="font-medium">诊断:</span> {record.diagnosis}</p>
                                         <p><span className="font-medium">日期:</span> {record.date}</p>
                                         <p><span className="font-medium">治疗:</span> {record.treatment}</p>
@@ -576,6 +499,195 @@ const DoctorRecords = () => {
                         >
                             下一页
                         </button>
+                    </div>
+                </div>
+            )}
+
+            {/* 编辑病例弹窗 */}
+            {showEditModal && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+                        <div className="sticky top-0 bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between rounded-t-2xl">
+                            <h2 className="text-xl font-bold text-slate-800">{editingId ? '编辑病例' : '新建病例'}</h2>
+                            <button
+                                onClick={() => {
+                                    resetForm();
+                                }}
+                                className="p-2 hover:bg-slate-100 rounded-lg transition"
+                            >
+                                <X size={20} className="text-slate-600" />
+                            </button>
+                        </div>
+                        <div className="p-6 space-y-4">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">患者姓名</label>
+                                    <input
+                                        type="text"
+                                        name="patient_name"
+                                        value={formData.patient_name}
+                                        onChange={handleFormChange}
+                                        placeholder="输入患者姓名，系统将尝试匹配ID"
+                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        required
+                                    />
+                                    {!editingId && <p className="text-xs text-slate-500 mt-1">若未自动匹配到ID，请让患者先有预约记录或联系管理员提供ID。</p>}
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">患者ID{!editingId && '（自动匹配）'}</label>
+                                    <input
+                                        type="text"
+                                        name="user_id"
+                                        value={formData.user_id}
+                                        onChange={handleFormChange}
+                                        placeholder={editingId ? "患者ID" : "将根据姓名自动匹配，必要时可手动填写"}
+                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">医院</label>
+                                    <input
+                                        type="text"
+                                        value={doctorInfo.hospital_name || '当前医院'}
+                                        readOnly
+                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-slate-50 text-slate-600"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">主诊医生</label>
+                                    <input
+                                        type="text"
+                                        value={doctorInfo.doctor_id || '当前医生'}
+                                        readOnly
+                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-slate-50 text-slate-600"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">就诊日期</label>
+                                    <input
+                                        type="date"
+                                        name="date"
+                                        value={formData.date}
+                                        onChange={handleFormChange}
+                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">诊断</label>
+                                    <input
+                                        type="text"
+                                        name="diagnosis"
+                                        value={formData.diagnosis}
+                                        onChange={handleFormChange}
+                                        placeholder="请输入诊断"
+                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        required
+                                    />
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 mb-1">治疗方案</label>
+                                <textarea
+                                    name="treatment"
+                                    value={formData.treatment}
+                                    onChange={handleFormChange}
+                                    placeholder="请输入治疗方案"
+                                    rows="3"
+                                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    required
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 mb-1">病情内容</label>
+                                <textarea
+                                    name="content"
+                                    value={formData.content}
+                                    onChange={handleFormChange}
+                                    placeholder="请输入详细病情"
+                                    rows="3"
+                                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 mb-2">用药</label>
+                                <div className="flex gap-2 mb-2">
+                                    <input
+                                        type="text"
+                                        value={medicationInput}
+                                        onChange={(e) => setMedicationInput(e.target.value)}
+                                        onKeyPress={(e) => {
+                                            if (e.key === 'Enter') {
+                                                e.preventDefault();
+                                                handleAddMedication();
+                                            }
+                                        }}
+                                        placeholder="输入药物名称后回车添加"
+                                        className="flex-1 px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    />
+                                    <button
+                                        onClick={handleAddMedication}
+                                        className="px-4 py-2 bg-slate-200 text-slate-700 rounded-lg hover:bg-slate-300 transition"
+                                    >
+                                        添加
+                                    </button>
+                                </div>
+                                <div className="flex flex-wrap gap-2">
+                                    {formData.medications.map((med, idx) => (
+                                        <div
+                                            key={idx}
+                                            className="flex items-center gap-2 px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm"
+                                        >
+                                            {med}
+                                            <button
+                                                onClick={() => handleRemoveMedication(idx)}
+                                                className="hover:opacity-70"
+                                            >
+                                                <X size={14} />
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 mb-1">检查图片URL</label>
+                                <input
+                                    type="text"
+                                    name="result_image"
+                                    value={formData.result_image}
+                                    onChange={handleFormChange}
+                                    placeholder="请输入检查图片URL"
+                                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                />
+                            </div>
+
+                            <div className="flex gap-3 justify-end pt-4 border-t border-slate-200">
+                                <button
+                                    onClick={() => {
+                                        resetForm();
+                                    }}
+                                    className="px-6 py-2.5 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition font-medium"
+                                >
+                                    取消
+                                </button>
+                                <button
+                                    onClick={handleSubmitForm}
+                                    className="flex items-center gap-2 px-6 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium shadow-sm"
+                                >
+                                    <Save size={18} />
+                                    保存病例
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </div>
             )}

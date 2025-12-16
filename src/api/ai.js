@@ -1,10 +1,15 @@
-// 使用本地mock服务器地址
-const API_ROOT = 'http://127.0.0.1:4523/m1/7500990-7236569-6684919';
+// 使用真实后端
+const API_ROOT = import.meta?.env?.VITE_API_BASE || 'http://10.78.120.72:8000/api';
 
 function getAuthHeaders() {
     const h = new Headers();
-    const token = localStorage.getItem('authToken');
-    if (token) h.append('Authorization', `Bearer ${token}`);
+    const token = localStorage.getItem('access_token') || localStorage.getItem('authToken');
+    if (token) {
+        h.append('Authorization', `Bearer ${token}`);
+        console.log('ai.js getAuthHeaders 使用 token:', token.substring(0, 20) + '...');
+    } else {
+        console.warn('ai.js getAuthHeaders 警告: 未找到 token');
+    }
     return h;
 }
 

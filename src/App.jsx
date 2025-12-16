@@ -115,7 +115,7 @@ const AppWithRouter = () => {
                 {/* 医生端路由 */}
                 <Route path="/doctorDashboard" element={
                     <div className="max-w-7xl mx-auto px-4 md:px-6">
-                        <DoctorDashboard navigateTo={navigateTo} />
+                        <DoctorAppointments />
                     </div>
                 } />
                 <Route path="/doctorAppointments" element={

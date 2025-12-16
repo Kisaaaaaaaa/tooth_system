@@ -22,6 +22,20 @@ const UserProfile = () => {
   const [codeTimer, setCodeTimer] = useState(0);
   const navigate = useNavigate();
 
+  // 同步用户信息到 localStorage，并派发事件通知 Navbar 刷新
+  const syncLocalUser = (patch = {}) => {
+    try {
+      const raw = localStorage.getItem('user');
+      const userObj = raw ? JSON.parse(raw) : {};
+      const updated = { ...userObj, ...patch };
+      localStorage.setItem('user', JSON.stringify(updated));
+      if (updated.role) localStorage.setItem('role', updated.role);
+      window.dispatchEvent(new Event('localStorageUpdated'));
+    } catch (e) {
+      console.error('syncLocalUser 失败:', e);
+    }
+  };
+
   useEffect(() => {
     const init = async () => {
       try {
@@ -45,10 +59,29 @@ const UserProfile = () => {
     init();
   }, []);
 
-  const uploadAvatarPreview = (file) => {
+  const uploadAvatarPreview = async (file) => {
     setAvatarFile(file);
-    const url = URL.createObjectURL(file);
-    setProfile(p => ({ ...p, avatar: url }));
+    const previewUrl = URL.createObjectURL(file);
+    setProfile(p => ({ ...p, avatar: previewUrl }));
+    setError('');
+    setMessage('');
+    try {
+      setLoading(true);
+      const res = await api.uploadAvatar(file, true);
+      const url = res?.data?.url || res?.url || res?.data?.path || res?.path || res?.data?.image_url || res?.image_url;
+      if (url) {
+        setProfile(p => ({ ...p, avatar: url }));
+        // 同步到 localStorage，便于 Navbar 立即刷新头像
+        syncLocalUser({ avatar: url });
+        setMessage('头像已上传');
+      } else {
+        setMessage('上传成功，但未返回头像地址');
+      }
+    } catch (e) {
+      setError(e.message || '上传头像失败');
+    } finally {
+      setLoading(false);
+    }
   };
 
   // 保存邮箱
@@ -64,9 +97,11 @@ const UserProfile = () => {
     }
     try {
       setLoading(true);
-      await api.updateProfile({ name: profile.name, avatar: profile.avatar, email: profile.email });
+      // 仅通过 auth.me 更新邮箱，不再携带 avatar URL
+      await api.updateMe({ email: profile.email });
       setMessage('邮箱已保存');
       setEmailEdit(false);
+      syncLocalUser({ email: profile.email });
     } catch (e) {
       setError(e.message || '保存邮箱失败');
     } finally {
@@ -83,8 +118,10 @@ const UserProfile = () => {
     }
     try {
       setLoading(true);
-      await api.updateProfile({ name: profile.name, avatar: profile.avatar, email: profile.email });
+      // 只更新可由该接口修改的文本字段（如 name），不再把 avatar URL 传给后端
+      await api.updateProfile({ name: profile.name });
       setMessage('资料已更新');
+      syncLocalUser({ name: profile.name });
       setEditMode(false);
     } catch (e) {
       setError(e.message || '更新失败');
@@ -129,12 +166,17 @@ const UserProfile = () => {
     }
     try {
       setLoading(true);
-      await api.changePasswordWithCode({ old_password: oldPwd, new_password: newPwd, email: profile.email, code: emailCode });
+      console.log('[用户端] 开始发送密码修改请求...');
+      const payload = { old_password: oldPwd, new_password: newPwd, email: profile.email, code: emailCode };
+      console.log('[用户端] 请求体:', { ...payload, old_password: '***', new_password: '***' });
+      await api.changePasswordWithCode(payload);
+      console.log('[用户端] 密码修改成功');
       setMessage('密码已修改，正在跳转首页...');
       // 直接跳转到首页
       navigate('/');
       setOldPwd(''); setNewPwd(''); setEmailCode('');
     } catch (e) {
+      console.error('[用户端] 密码修改失败:', e);
       setError(e.message || '修改密码失败');
     } finally {
       setLoading(false);

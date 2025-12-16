@@ -115,6 +115,15 @@ const DoctorConsultation = () => {
             const res = await consultationApi.sendMessage(selectedSession.id, input);
             console.log('发送消息响应:', res);
 
+            // 检查业务状态码
+            const bizCode = res?.code ?? res?.status ?? res?.data?.code;
+            if (bizCode && Number(bizCode) >= 400) {
+                const msg = res?.message || res?.data?.message || '发送消息失败';
+                setError(msg);
+                console.warn('发送消息失败:', msg);
+                return;
+            }
+
             // 判断成功：HTTP 200 + 有响应数据即可（不依赖 code 字段）
             if (res && res.data) {
                 // 乐观更新：立即添加到消息列表
@@ -136,7 +145,8 @@ const DoctorConsultation = () => {
             }
         } catch (err) {
             console.error('发送消息失败:', err);
-            setError('发送消息失败');
+            const errorMsg = err?.message || '发送消息失败';
+            setError(errorMsg);
         } finally {
             setSending(false);
         }

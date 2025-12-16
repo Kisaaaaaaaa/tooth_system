@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import api from '../../api/auth';
+import { resolveMediaUrl } from '../../api/utils';
 
 // 顶部导航栏组件
 const Navbar = ({ currentPage, navigateTo }) => {
@@ -17,7 +18,6 @@ const Navbar = ({ currentPage, navigateTo }) => {
 
     // 医生端菜单
     const doctorPageLabels = {
-        'doctorDashboard': '仪表板',
         'doctorAppointments': '预约管理',
         'doctorRecords': '病例管理',
         'doctorConsultation': '在线问诊',
@@ -227,13 +227,14 @@ const Navbar = ({ currentPage, navigateTo }) => {
                         title={user ? (user.name || (user.user && user.user.name) || user.phone || (user.user && user.user.phone)) : '登录'}
                     >
                         <img
-                            src={
-                                user && (user.avatar || (user.user && user.user.avatar))
-                                  ? (user.avatar || (user.user && user.user.avatar))
-                                  : 'https://i.pravatar.cc/150?u=user'
-                            }
+                                                        src={
+                                                                user && (user.avatar || (user.user && user.user.avatar))
+                                                                    ? resolveMediaUrl(user.avatar || (user.user && user.user.avatar))
+                                                                    : '/images/avatar-fallback.svg'
+                                                        }
                             alt={user ? (user.name || (user.user && user.user.name) || user.phone || (user.user && user.user.phone)) : '默认头像'}
                             className="object-cover w-full h-full"
+                            onError={(e) => { e.currentTarget.src = '/images/avatar-fallback.svg'; }}
                         />
                     </div>
                 </div>

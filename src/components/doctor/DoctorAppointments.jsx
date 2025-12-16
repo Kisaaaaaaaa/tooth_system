@@ -6,7 +6,7 @@ const DoctorAppointments = () => {
     const [appointments, setAppointments] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
-    const [filter, setFilter] = useState('all'); // all, pending, completed
+    const [filter, setFilter] = useState('all'); // all, pending, checked-in, completed
 
     useEffect(() => {
         fetchAppointments();
@@ -19,41 +19,21 @@ const DoctorAppointments = () => {
             // 获取所有预约数据，不依赖API过滤
             const res = await doctorApi.getAppointments();
             console.log('API响应数据:', res);
-            if (res && res.data) {
-                // 处理分页数据结构
-                if (res.data.results && Array.isArray(res.data.results)) {
-                    setAppointments(res.data.results);
-                } else if (Array.isArray(res.data)) {
-                    setAppointments(res.data);
-                } else {
-                    setAppointments([]);
-                }
-            } else if (Array.isArray(res)) {
-                setAppointments(res);
+
+            const payload = res?.data?.results
+                || res?.data?.data?.results
+                || res?.results
+                || res?.data
+                || res;
+
+            if (Array.isArray(payload)) {
+                setAppointments(payload);
             } else {
-                // 使用模拟数据
-                setAppointments([
-                    {
-                        id: 1,
-                        patient_name: '张三',
-                        appointment_time: '2025-12-15 14:00',
-                        status: 'pending',
-                        service: '洁牙',
-                        phone: '13800138000'
-                    },
-                    {
-                        id: 2,
-                        patient_name: '李四',
-                        appointment_time: '2025-12-15 15:30',
-                        status: 'pending',
-                        service: '根管治疗',
-                        phone: '13800138001'
-                    }
-                ]);
+                setAppointments([]);
             }
         } catch (err) {
             console.error('获取预约列表失败:', err);
-            setError('获取预约列表失败');
+            setError(err?.message || '获取预约列表失败');
         } finally {
             setLoading(false);
         }
@@ -73,17 +53,26 @@ const DoctorAppointments = () => {
         }
     };
 
-    const getStatusBadge = (status) => {
-        // 将API状态映射为前端状态
-        const normalizedStatus = status === 'upcoming' ? 'pending' : status;
+    const normalizeStatus = (status) => {
+        if (!status) return 'pending';
+        const map = {
+            upcoming: 'pending',
+            'checked-in': 'checked-in',
+            completed: 'completed',
+            cancelled: 'cancelled'
+        };
+        return map[status] || status;
+    };
 
+    const getStatusBadge = (status) => {
+        const normalizedStatus = normalizeStatus(status);
         const statusMap = {
             pending: { label: '待进行', color: 'bg-yellow-100 text-yellow-800', icon: Clock },
             'checked-in': { label: '已签到', color: 'bg-blue-100 text-blue-800', icon: Check },
             completed: { label: '已完成', color: 'bg-green-100 text-green-800', icon: Check },
             cancelled: { label: '已取消', color: 'bg-red-100 text-red-800', icon: AlertCircle }
         };
-        const config = statusMap[normalizedStatus] || { label: status, color: 'bg-slate-100 text-slate-800' };
+        const config = statusMap[normalizedStatus] || { label: normalizedStatus, color: 'bg-slate-100 text-slate-800' };
         const Icon = config.icon;
         return (
             <div className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm ${config.color}`}>
@@ -91,6 +80,23 @@ const DoctorAppointments = () => {
                 {config.label}
             </div>
         );
+    };
+
+    const normalizeAppointments = () => appointments.map(item => ({
+        ...item,
+        status: normalizeStatus(item.status)
+    }));
+
+    const groupPendingByDateAndTime = (list) => {
+        const grouped = {};
+        list.forEach(apt => {
+            const dateKey = apt.appointment_date || '未填写日期';
+            const timeKey = apt.appointment_time || '未填写时间';
+            if (!grouped[dateKey]) grouped[dateKey] = {};
+            if (!grouped[dateKey][timeKey]) grouped[dateKey][timeKey] = [];
+            grouped[dateKey][timeKey].push(apt);
+        });
+        return grouped;
     };
 
     if (loading) {
@@ -104,20 +110,26 @@ const DoctorAppointments = () => {
         );
     }
 
-    const pendingCount = appointments.filter(a => a.status === 'pending' || a.status === 'upcoming').length;
-    const checkedInCount = appointments.filter(a => a.status === 'checked-in').length;
-    const completedCount = appointments.filter(a => a.status === 'completed').length;
+    const normalizedList = normalizeAppointments();
+    const pendingList = normalizedList.filter(a => a.status === 'pending');
+    const checkedInList = normalizedList.filter(a => a.status === 'checked-in');
+    const completedList = normalizedList.filter(a => a.status === 'completed');
+
+    const pendingCount = pendingList.length;
+    const checkedInCount = checkedInList.length;
+    const completedCount = completedList.length;
 
     // 根据过滤条件获取显示的预约列表
     const getFilteredAppointments = () => {
-        if (filter === 'all') return appointments;
-        if (filter === 'pending') {
-            return appointments.filter(apt => apt.status === 'pending' || apt.status === 'upcoming');
-        }
-        return appointments.filter(apt => apt.status === filter);
+        if (filter === 'all') return normalizedList;
+        if (filter === 'pending') return pendingList;
+        if (filter === 'checked-in') return checkedInList;
+        if (filter === 'completed') return completedList;
+        return normalizedList;
     };
 
     const filteredAppointments = getFilteredAppointments();
+    const groupedPending = filter === 'pending' ? groupPendingByDateAndTime(filteredAppointments) : {};
 
     return (
         <div className="space-y-6 py-6 animate-fade-in">
@@ -198,6 +210,39 @@ const DoctorAppointments = () => {
                         <Calendar className="mx-auto mb-3 text-slate-400" size={40} />
                         <p className="text-slate-600">暂无预约记录</p>
                     </div>
+                ) : filter === 'pending' ? (
+                    Object.entries(groupedPending).sort().map(([dateKey, timeMap]) => (
+                        <div key={dateKey} className="bg-white rounded-xl shadow-sm p-6 border border-slate-100 space-y-4">
+                            <div className="flex items-center gap-2 text-slate-900 font-semibold text-lg">
+                                <Calendar size={16} />
+                                <span>{dateKey}</span>
+                                <span className="text-sm text-slate-500 font-normal">{Object.values(timeMap).reduce((sum, arr) => sum + arr.length, 0)} 人</span>
+                            </div>
+                            {Object.entries(timeMap).sort().map(([timeSlot, list]) => (
+                                <div key={timeSlot} className="space-y-2">
+                                    <div className="flex items-center gap-2 text-slate-800 font-medium">
+                                        <Clock size={14} />
+                                        <span>{timeSlot}</span>
+                                        <span className="text-xs text-slate-500">{list.length} 人</span>
+                                    </div>
+                                    <div className="space-y-2">
+                                        {list.map(apt => (
+                                            <div key={apt.id} className="flex items-start justify-between bg-slate-50 border border-slate-100 rounded-lg p-4">
+                                                <div>
+                                                    <p className="text-base font-bold text-slate-800">{apt.patient_name}</p>
+                                                    <p className="text-sm text-slate-600 mt-1">电话：{apt.patient_phone || '未填写'}</p>
+                                                    <p className="text-sm text-slate-600">症状：{apt.symptoms || '常规检查'}</p>
+                                                </div>
+                                                <div className="text-right">
+                                                    {getStatusBadge(apt.status)}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    ))
                 ) : (
                     filteredAppointments.map(apt => (
                         <div key={apt.id} className="bg-white rounded-xl shadow-sm p-6 border border-slate-100 hover:shadow-md transition">
@@ -205,8 +250,9 @@ const DoctorAppointments = () => {
                                 <div className="flex-1">
                                     <h3 className="text-lg font-bold text-slate-800">{apt.patient_name}</h3>
                                     <div className="grid grid-cols-2 gap-2 mt-3 text-sm text-slate-600">
-                                        <p><span className="font-medium">服务:</span> {apt.symptoms || '常规检查'}</p>
+                                        <p><span className="font-medium">日期:</span> {apt.appointment_date}</p>
                                         <p><span className="font-medium">时间:</span> {apt.appointment_time}</p>
+                                        <p><span className="font-medium">服务:</span> {apt.symptoms || '常规检查'}</p>
                                         <p><span className="font-medium">电话:</span> {apt.patient_phone}</p>
                                         <div>
                                             <span className="font-medium">状态:</span>
@@ -217,7 +263,7 @@ const DoctorAppointments = () => {
                                     </div>
                                 </div>
 
-                                {(apt.status === 'pending' || apt.status === 'upcoming') && (
+                                {apt.status === 'checked-in' && (
                                     <button
                                         onClick={() => handleCompleteAppointment(apt.id)}
                                         className="ml-4 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition font-medium"
