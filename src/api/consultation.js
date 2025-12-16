@@ -1,7 +1,7 @@
 // 在线问诊 API 接口
 // 医生端和患者端都使用这些接口进行消息交互
 
-const API_BASE = 'http://127.0.0.1:4523/m1/7500990-7236569-6684919';
+const API_BASE = 'http://10.78.120.72:8000/api';
 
 function getAuthHeader() {
     const token = localStorage.getItem('authToken') || localStorage.getItem('access_token');
@@ -55,7 +55,7 @@ export async function createConsultationSession(sessionData) {
 export async function getConsultationSessions(params = {}) {
     try {
         const queryStr = new URLSearchParams(params).toString();
-        const url = queryStr ? `${API_BASE}/consultations?${queryStr}` : `${API_BASE}/consultations`;
+        const url = queryStr ? `${API_BASE}/consultations/?${queryStr}` : `${API_BASE}/consultations/`;
         const response = await fetch(url, {
             method: 'GET',
             headers: getAuthHeader(),
@@ -85,8 +85,8 @@ export async function getConsultationDetail(consultationId, params = {}) {
     try {
         const queryStr = new URLSearchParams(params).toString();
         const url = queryStr 
-            ? `${API_BASE}/consultations/${consultationId}?${queryStr}` 
-            : `${API_BASE}/consultations/${consultationId}`;
+            ? `${API_BASE}/consultations/${consultationId}/?${queryStr}` 
+            : `${API_BASE}/consultations/${consultationId}/`;
         const response = await fetch(url, {
             method: 'GET',
             headers: getAuthHeader(),
@@ -124,7 +124,7 @@ export async function getConsultationSessionDetail(sessionId) {
 export async function sendMessage(consultationId, text) {
     try {
         const messageData = JSON.stringify({ text });
-        const url = `${API_BASE}/consultations/${consultationId}/messages`;
+        const url = `${API_BASE}/consultations/${consultationId}/messages/`;
         console.log('发送消息 URL:', url);
         console.log('发送消息 body:', messageData);
         
@@ -158,7 +158,7 @@ export async function sendMessage(consultationId, text) {
  */
 export async function closeConsultationSession(consultationId) {
     try {
-        const response = await fetch(`${API_BASE}/consultations/${consultationId}/close`, {
+        const response = await fetch(`${API_BASE}/consultations/${consultationId}/close/`, {
             method: 'POST',
             headers: getAuthHeader(),
             redirect: 'follow'

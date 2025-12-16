@@ -34,31 +34,54 @@ const Login = ({ navigateTo }) => {
         api.getCaptcha().then(r => {
             if (!mounted || finished) return;
             clearTimeout(timeoutId);
-            // 如果r为null，表示请求失败，保持本地验证码
-            if (r && (r.image || r.raw || r.captcha)) {
-                if (r.image) {
-                    setCaptchaImage(r.image);
+            console.log('=== 后端返回验证码 ===');
+            console.log('返回数据:', r);
+            
+            // 后端返回的是 { code: 200, message: '...', data: { captcha_id, captcha_image } }
+            const data = r?.data || r;
+            console.log('提取的 data:', data);
+            
+            if (data && (data.captcha_image || data.image || data.raw || data.captcha)) {
+                console.log('检测到后端验证码，准备使用');
+                if (data.captcha_image) {
+                    console.log('使用后端图片验证码，ID:', data.captcha_id);
+                    setCaptchaImage(data.captcha_image);
                     setCaptchaText('');
-                    setCaptchaId(r.id || r.captcha_id || null);
+                    setCaptchaId(data.captcha_id || null);
                     setUseServerCaptcha(true);
-                } else if (r.raw) {
-                    if (/^[A-Za-z0-9+/=]+$/.test(r.raw)) {
-                        setCaptchaImage('data:image/png;base64,' + r.raw);
+                } else if (data.image) {
+                    console.log('使用图片验证码');
+                    setCaptchaImage(data.image);
+                    setCaptchaText('');
+                    setCaptchaId(data.id || data.captcha_id || null);
+                    setUseServerCaptcha(true);
+                } else if (data.raw) {
+                    console.log('检测到raw字段');
+                    if (/^[A-Za-z0-9+/=]+$/.test(data.raw)) {
+                        console.log('raw是base64，作为图片使用');
+                        setCaptchaImage('data:image/png;base64,' + data.raw);
                         setCaptchaText('');
                         setUseServerCaptcha(true);
                         setCaptchaId(null);
                     } else {
+                        console.log('raw是文本验证码:', data.raw);
                         setCaptchaImage('');
-                        setCaptchaText(r.raw);
+                        setCaptchaText(data.raw);
                         setUseServerCaptcha(false);
                     }
-                } else {
+                } else if (data.captcha) {
+                    console.log('使用captcha字段:', data.captcha);
                     setCaptchaImage('');
-                    setCaptchaText(String(r));
+                    setCaptchaText(String(data.captcha));
+                    setUseServerCaptcha(true);
+                    setCaptchaId(data.id || data.captcha_id || null);
                 }
+            } else {
+                console.log('后端返回验证码失败或为null，保持本地验证码');
             }
-        }).catch(() => {
+        }).catch((err) => {
             // 保持本地验证码
+            console.log('获取后端验证码异常，保持本地验证码:', err);
         });
         return () => { mounted = false; clearTimeout(timeoutId); };
     }, []);
@@ -69,21 +92,30 @@ const Login = ({ navigateTo }) => {
     const refreshCaptcha = async () => {
         try {
             const r = await api.getCaptcha();
-            // 如果r为null，表示请求失败，使用本地验证码
-            if (r && r.image) {
-                setCaptchaImage(r.image);
+            const data = r?.data || r;
+            console.log('刷新验证码，返回数据:', data);
+            
+            // 后端返回的图片验证码
+            if (data && data.captcha_image) {
+                console.log('刷新为后端图片验证码，ID:', data.captcha_id);
+                setCaptchaImage(data.captcha_image);
                 setCaptchaText('');
                 setUseServerCaptcha(true);
-                setCaptchaId(r.id || r.captcha_id || null);
-            } else if (r && r.raw) {
-                if (/^[A-Za-z0-9+/=]+$/.test(r.raw)) {
-                    setCaptchaImage('data:image/png;base64,' + r.raw);
+                setCaptchaId(data.captcha_id || null);
+            } else if (data && data.image) {
+                setCaptchaImage(data.image);
+                setCaptchaText('');
+                setUseServerCaptcha(true);
+                setCaptchaId(data.id || data.captcha_id || null);
+            } else if (data && data.raw) {
+                if (/^[A-Za-z0-9+/=]+$/.test(data.raw)) {
+                    setCaptchaImage('data:image/png;base64,' + data.raw);
                     setCaptchaText('');
                     setUseServerCaptcha(true);
                     setCaptchaId(null);
                 } else {
                     setCaptchaImage('');
-                    setCaptchaText(r.raw);
+                    setCaptchaText(data.raw);
                     setUseServerCaptcha(false);
                 }
             } else {
@@ -93,6 +125,7 @@ const Login = ({ navigateTo }) => {
                 setUseServerCaptcha(false);
             }
         } catch (err) {
+            console.log('刷新验证码失败:', err);
             const text = generateCaptcha(5);
             setCaptchaImage('');
             setCaptchaText(text);
@@ -186,6 +219,11 @@ const Login = ({ navigateTo }) => {
             return;
         }
 
+        if (!password) {
+            setError('请输入密码');
+            return;
+        }
+
         // 仅在本地文本验证码时校验；如果是服务器图片验证码，由后端校验
         if (captchaText && captchaInput.trim().toUpperCase() !== captchaText.toUpperCase()) {
             setError('验证码错误，请刷新后重试');
@@ -197,50 +235,103 @@ const Login = ({ navigateTo }) => {
         // 调用后端登录接口
         try {
             console.log('=== 开始登录流程 ===');
-            const payload = { phone, password, captcha_id: captchaId, captcha: captchaInput };
+            // 如果使用本地验证码，则不发送captcha_id
+            const payload = { 
+                phone, 
+                password,
+                // 只在使用服务器验证码时才发送captcha_id和captcha
+                ...(useServerCaptcha ? { captcha_id: captchaId, captcha: captchaInput } : { captcha: captchaInput })
+            };
             console.log('登录请求参数:', payload);
+            console.log('使用服务器验证码:', useServerCaptcha);
             
             // 使用api.login函数确保使用正确的mock服务器地址
             const res = await api.login(payload);
             console.log('登录响应:', res);
+
+            // 业务失败（即使 HTTP 200 也要拦截提示）
+            const bizCode = res?.code ?? res?.status ?? res?.data?.code;
+            if (bizCode && Number(bizCode) >= 400) {
+                const msg = res?.message || res?.data?.message || '登录失败，请检查账号或验证码';
+                setError(msg);
+                refreshCaptcha();
+                return;
+            }
             
-            // 手动设置localStorage
-            if (res && res.token) {
-                console.log('手动设置token:', res.token);
-                localStorage.setItem('authToken', res.token);
+            // 提取 token 和 user 数据
+            let token = null;
+            let userData = null;
+            
+            // 后端返回格式: { code: 200, message: '...', data: { user: {...}, access_token: '...', refresh_token: '...' } }
+            if (res && res.data) {
+                console.log('检测到 res.data 结构');
+                const data = res.data;
+                
+                // 尝试从 data 中提取 token
+                if (data.access_token) {
+                    token = data.access_token;
+                    console.log('从 data.access_token 提取 token');
+                } else if (data.token) {
+                    token = data.token;
+                    console.log('从 data.token 提取 token');
+                }
+                
+                // 尝试从 data 中提取用户数据
+                if (data.user) {
+                    userData = data.user;
+                    console.log('从 data.user 提取用户数据');
+                } else {
+                    userData = data;
+                    console.log('使用 data 作为用户数据');
+                }
+                
+                // 保存 refresh token
+                if (data.refresh_token) {
+                    localStorage.setItem('refresh_token', data.refresh_token);
+                    console.log('保存 refresh_token');
+                }
             } else if (res && res.access_token) {
-                console.log('手动设置token为access_token:', res.access_token);
-                localStorage.setItem('authToken', res.access_token);
-            } else if (typeof res === 'string' && res.length > 0) {
-                console.log('手动设置token为字符串:', res);
-                localStorage.setItem('authToken', res);
+                token = res.access_token;
+                userData = res;
+                console.log('直接从 res.access_token 提取 token');
+            } else if (res && res.token) {
+                token = res.token;
+                userData = res;
+                console.log('直接从 res.token 提取 token');
+            }
+            
+            // 保存 token
+            if (token) {
+                localStorage.setItem('access_token', token);
+                localStorage.setItem('authToken', token);  // 兼容旧代码
+                console.log('Token 已保存，值:', token.substring(0, 20) + '...');
             } else {
-                console.log('登录响应格式异常，无法提取token:', res);
-                // 模拟登录成功，设置测试token
+                console.warn('未能提取 token，登录响应可能格式不正确');
                 localStorage.setItem('authToken', 'test-token-' + Date.now());
             }
 
             // 写入用户信息（兼容后端返回格式）
+            // 后端返回格式: { code: 200, message: '...', data: { user: {...}, access_token: '...', ... } }
             let userObj = null;
-            if (res && res.data) {
-                userObj = res.data;
-            } else if (res && res.user) {
-                userObj = res.user;
-            } else if (res && res.name) {
-                userObj = res;
-            }
             
-            // 如果 userObj 仍然包含顶层的 token/refresh_token，说明它是响应对象而非真正的 user 对象
-            // 此时应该提取其中的 user 字段
-            if (userObj && userObj.token && userObj.user && typeof userObj.user === 'object') {
-                console.log('检测到响应对象包含嵌套user，提取user对象');
-                userObj = userObj.user;
+            if (userData) {
+                if (userData.user && typeof userData.user === 'object') {
+                    userObj = userData.user;
+                    console.log('从 userData.user 提取用户对象');
+                } else {
+                    userObj = userData;
+                    console.log('使用 userData 作为用户对象');
+                }
+            } else if (res && res.data && res.data.user) {
+                userObj = res.data.user;
+                console.log('从 res.data.user 提取用户对象');
             }
             
             if (userObj) {
                 localStorage.setItem('user', JSON.stringify(userObj));
-                console.log('设置后的user:', localStorage.getItem('user'));
-                console.log('userObj.role:', userObj.role);
+                console.log('设置用户信息:', userObj.phone || userObj.name || userObj.id);
+            } else {
+                console.warn('未能提取用户信息');
             }
 
             // 保存 role 字段（用于区分用户和医生）
@@ -262,7 +353,7 @@ const Login = ({ navigateTo }) => {
             // 根据 role 判断跳转页面
             let targetPage = '';
             if (userObj && userObj.role === 'doctor') {
-                targetPage = 'doctorDashboard';
+                targetPage = 'doctorAppointments';
             } else if (userObj && userObj.role === 'admin') {
                 targetPage = 'admin';
             } else {

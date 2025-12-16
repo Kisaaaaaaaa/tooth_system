@@ -39,7 +39,7 @@ const DoctorDashboard = ({ navigateTo }) => {
                 specialty: '口腔修复',
                 department: '修复科',
                 is_online: false,
-                avatar: 'https://i.pravatar.cc/150?u=doctor1'
+                avatar: '/images/avatar-fallback.svg'
             });
         } finally {
             setLoading(false);
@@ -87,7 +87,7 @@ const DoctorDashboard = ({ navigateTo }) => {
                 <div className="flex items-start justify-between">
                     <div className="flex items-center gap-4">
                         <img
-                            src={doctor?.avatar || 'https://i.pravatar.cc/150?u=doctor'}
+                            src={doctor?.avatar || '/images/avatar-fallback.svg'}
                             alt={doctor?.name}
                             className="w-16 h-16 rounded-full object-cover"
                         />

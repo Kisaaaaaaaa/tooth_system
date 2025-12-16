@@ -199,7 +199,7 @@ const AiInquiryPage = () => {
               <div key={idx} className={`flex items-end ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                 {m.role !== 'user' && (
                   <div className="w-8 h-8 rounded-full bg-slate-200 flex-shrink-0 mr-2 overflow-hidden border border-slate-300">
-                    <img src="https://i.pravatar.cc/40?u=ai" alt="AI" className="w-full h-full object-cover" />
+                    <img src="/images/avatar-fallback.svg" alt="AI" className="w-full h-full object-cover" />
                   </div>
                 )}
 
@@ -210,7 +210,7 @@ const AiInquiryPage = () => {
 
                 {m.role === 'user' && (
                   <div className="w-8 h-8 rounded-full bg-slate-200 flex-shrink-0 ml-2 overflow-hidden border border-slate-300">
-                    <img src="https://i.pravatar.cc/40?u=user" alt="User" className="w-full h-full object-cover" />
+                    <img src="/images/avatar-fallback.svg" alt="User" className="w-full h-full object-cover" />
                   </div>
                 )}
               </div>
