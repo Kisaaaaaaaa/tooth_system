@@ -204,22 +204,107 @@ export const MOCK_HOSPITALS = [
     },
 ];
 
+export const MOCK_CONSULTATION_HISTORIES = [
+    {
+        consultation_id: 1,
+        doctor_id: 1,
+        doctor_name: '张智齿',
+        doctor_avatar: 'https://i.pravatar.cc/150?u=1',
+        doctor_title: '主任医师',
+        last_message: '持续多久了？这是之前的X光片显示的区域吗？',
+        last_time: '10:03',
+        unread: 0,
+        messages: [
+            { id: 1, sender: 'doctor', text: '你好，请问牙齿哪里不舒服？', time: '10:00' },
+            { id: 2, sender: 'user', text: '右边后面的一颗牙咬东西有点酸。', time: '10:02' },
+            { id: 3, sender: 'doctor', text: '持续多久了？这是之前的X光片显示的区域吗？', time: '10:03' },
+        ]
+    },
+    {
+        consultation_id: 2,
+        doctor_id: 2,
+        doctor_name: '李正畸',
+        doctor_avatar: 'https://i.pravatar.cc/150?u=2',
+        doctor_title: '副主任医师',
+        last_message: '可以考虑隐形矫正，效果更好一些。',
+        last_time: '昨天 15:30',
+        unread: 1,
+        messages: [
+            { id: 1, sender: 'user', text: '医生，我的牙齿有点不齐，可以矫正吗？', time: '昨天 15:25' },
+            { id: 2, sender: 'doctor', text: '可以考虑隐形矫正，效果更好一些。', time: '昨天 15:30' },
+        ]
+    },
+    {
+        consultation_id: 3,
+        doctor_id: 3,
+        doctor_name: '王洁牙',
+        doctor_avatar: 'https://i.pravatar.cc/150?u=3',
+        doctor_title: '主治医师',
+        last_message: '建议每半年洁牙一次，保持口腔健康。',
+        last_time: '3天前 09:15',
+        unread: 0,
+        messages: [
+            { id: 1, sender: 'user', text: '医生，我多久需要洁牙一次？', time: '3天前 09:10' },
+            { id: 2, sender: 'doctor', text: '建议每半年洁牙一次，保持口腔健康。', time: '3天前 09:15' },
+        ]
+    }
+];
+
+
 export const MOCK_DOCTORS = [
     {
         id: 1, name: "张智齿", title: "主任医师", score: 4.9, specialty: "复杂拔牙",
-        avatar: "https://i.pravatar.cc/150?u=1", reviews: 120
+        avatar: "https://i.pravatar.cc/150?u=1", reviews: 120, hospital_id: 1,
+        reviewsData: [
+            { id: 1, content: "张医生技术非常好，拔除阻生智齿一点都不疼，恢复得也很快！", rating: 5, date: "2024-01-15", patient: "王先生" },
+            { id: 2, content: "主任医师果然名不虚传，经验丰富，讲解也很清楚。", rating: 5, date: "2024-01-10", patient: "李女士" },
+            { id: 3, content: "服务态度好，技术精湛，值得推荐！", rating: 4, date: "2024-01-05", patient: "刘先生" }
+        ]
     },
     {
         id: 2, name: "李正畸", title: "副主任医师", score: 4.8, specialty: "隐形矫正",
-        avatar: "https://i.pravatar.cc/150?u=2", reviews: 98
+        avatar: "https://i.pravatar.cc/150?u=2", reviews: 98, hospital_id: 1,
+        reviewsData: [
+            { id: 1, content: "李医生矫正技术很棒，现在牙齿变得很整齐，非常满意！", rating: 5, date: "2024-01-12", patient: "陈女士" },
+            { id: 2, content: "隐形矫正几乎看不出来，李医生很专业，态度也很好。", rating: 4, date: "2024-01-08", patient: "张先生" },
+            { id: 3, content: "矫正过程很顺利，李医生会定期跟进，效果很好。", rating: 5, date: "2024-01-03", patient: "王女士" }
+        ]
     },
     {
         id: 3, name: "王洁牙", title: "主治医师", score: 4.7, specialty: "牙周治疗",
-        avatar: "https://i.pravatar.cc/150?u=3", reviews: 250
+        avatar: "https://i.pravatar.cc/150?u=3", reviews: 250, hospital_id: 1,
+        reviewsData: [
+            { id: 1, content: "王医生洁牙很细致，牙齿变得很干净，没有任何不适。", rating: 5, date: "2024-01-14", patient: "赵先生" },
+            { id: 2, content: "牙周治疗后牙龈出血的问题得到了明显改善。", rating: 4, date: "2024-01-09", patient: "孙女士" },
+            { id: 3, content: "服务态度很好，技术也不错，推荐！", rating: 4, date: "2024-01-04", patient: "周先生" }
+        ]
     },
     {
         id: 4, name: "赵种植", title: "教授", score: 5.0, specialty: "全口种植", avatar: "https://i.pravatar.cc/150?u=4",
-        reviews: 88
+        reviews: 88, hospital_id: 2,
+        reviewsData: [
+            { id: 1, content: "赵教授种牙技术一流，完全感觉不到疼痛，效果非常好！", rating: 5, date: "2024-01-17", patient: "许先生" },
+            { id: 2, content: "设备先进，环境舒适，赵教授经验丰富，值得信赖。", rating: 5, date: "2024-01-12", patient: "何女士" },
+            { id: 3, content: "种牙后的牙齿非常自然，咀嚼功能恢复得很好。", rating: 5, date: "2024-01-07", patient: "吕先生" }
+        ]
+    },
+    {
+        id: 5, name: "钱修复", title: "主治医师", score: 4.6, specialty: "牙齿修复", avatar: "https://i.pravatar.cc/150?u=5",
+        reviews: 156, hospital_id: 2,
+        reviewsData: [
+            { id: 1, content: "钱医生修复技术很好，牙齿看起来很自然，非常满意。", rating: 4, date: "2024-01-15", patient: "施女士" },
+            { id: 2, content: "态度认真负责，修复过程很顺利。", rating: 4, date: "2024-01-10", patient: "张女士" },
+            { id: 3, content: "专业水平高，解答问题耐心细致。", rating: 4, date: "2024-01-05", patient: "孔先生" }
+        ]
+    },
+    {
+        id: 6, name: "孙儿童", title: "副主任医师", score: 4.9, specialty: "儿童口腔", avatar: "https://i.pravatar.cc/150?u=6",
+        reviews: 203, hospital_id: 2,
+        reviewsData: [
+            { id: 1, content: "孙医生对孩子特别有耐心，孩子本来很害怕，现在反而很愿意来。", rating: 5, date: "2024-01-16", patient: "朱女士" },
+            { id: 2, content: "窝沟封闭做得很好，孙医生讲解得很清楚。", rating: 5, date: "2024-01-11", patient: "秦先生" },
+            { id: 3, content: "儿童口腔治疗很专业，环境也适合孩子。", rating: 4, date: "2024-01-06", patient: "尤先生" }
+        ]
     },
 ];
 

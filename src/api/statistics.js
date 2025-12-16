@@ -12,15 +12,15 @@ function handleResponse(res) {
       return res.json().then(j => {
         // 尝试解析错误信息，提取用户友好的提示
         let errorMessage = '';
-        
+
         if (j.message) {
           try {
             const messageStr = j.message;
             const errors = [];
-            
+
             // 直接使用正则表达式提取所有中文错误信息
             const errorMatches = messageStr.match(/'([^']*[\u4e00-\u9fa5]+[^']*)'/g);
-            
+
             if (errorMatches) {
               // 移除引号并将所有错误信息合并
               errorMatches.forEach(match => {
@@ -38,12 +38,12 @@ function handleResponse(res) {
         } else if (typeof j === 'string') {
           errorMessage = j;
         }
-        
+
         // 如果没有提取到错误信息，使用默认的错误提示
         if (!errorMessage) {
           errorMessage = `${res.status} ${res.statusText}`;
         }
-        
+
         throw new Error(errorMessage);
       });
     }
@@ -96,6 +96,6 @@ export async function getHomeStatistics() {
 }
 
 export default {
-    getHomeStatistics,
+  getHomeStatistics,
 };
 
