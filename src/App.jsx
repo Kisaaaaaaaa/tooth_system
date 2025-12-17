@@ -59,9 +59,6 @@ const AppWithRouter = () => {
 
     // Router Logic
     const navigateTo = (page, params = {}) => {
-        if (params.hospitalId) {
-            setSelectedHospitalId(params.hospitalId);
-        }
         window.scrollTo({ top: 0, behavior: 'smooth' });
 
         // 跳医院详情时直接带上参数到路由，避免刷新丢状态
