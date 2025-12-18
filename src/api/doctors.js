@@ -53,7 +53,7 @@ export async function getDoctors(params = {}) {
     redirect: 'follow'
   };
 
-  const res = await fetch(`${API_BASE}/doctors?${queryParams.toString()}`, requestOptions);
+  const res = await fetch(`${API_BASE}/doctors/?${queryParams.toString()}`, requestOptions);
   return handleResponse(res);
 }
 
@@ -68,7 +68,7 @@ export async function getDoctorDetail(doctor_id) {
     redirect: 'follow'
   };
 
-  const res = await fetch(`${API_BASE}/doctors/${doctor_id}`, requestOptions);
+  const res = await fetch(`${API_BASE}/doctors/${doctor_id}/`, requestOptions);
   return handleResponse(res);
 }
 

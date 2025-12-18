@@ -1,7 +1,7 @@
 // API wrapper for admin endpoints
 
 // 使用后端 API 地址
-const API_BASE = 'http://10.78.120.72:8000/api';
+const API_BASE = 'http://localhost:8000/api';
 
 function handleResponse(res) {
     const ct = res.headers.get('content-type') || '';

@@ -2,7 +2,7 @@
 // All functions return parsed JSON when possible.
 
 const API_BASE = 'http://localhost:8000/api';
-function getAuthHeaders() {
+function GetAuthHeaders() {
     const h = new Headers();
     const token = localStorage.getItem('access_token');
     if (token) {
@@ -13,7 +13,7 @@ function getAuthHeaders() {
 
 
 
-function handleResp(resp) {
+function HandleResp(resp) {
     const ct = resp.headers.get('content-type') || '';
     if (!resp.ok) {
         if (ct.includes('application/json')) {
@@ -51,58 +51,84 @@ function handleResp(resp) {
     return resp.text();
 }
 
-export async function createConsultation({ doctor_id, initial_message } = {}) {
-    const headers = getAuthHeaders();
+export async function CreateConsultation({ doctor_id, initial_message } = {}) {
+    const headers = GetAuthHeaders();
     headers.append('Content-Type', 'application/json');
     const body = JSON.stringify({ doctor_id, initial_message });
-    const resp = await fetch(`${API_BASE}/consultations/`, { method: 'POST', headers, body, redirect: 'follow' });
-    return handleResp(resp);
+    const url = `${API_BASE}/consultations/`;
+    console.log('创建问诊会话 URL:', url);
+    console.log('创建问诊会话 body:', body);
+    const resp = await fetch(url, { method: 'POST', headers, body, redirect: 'follow' });
+    console.log('创建问诊会话 HTTP 状态码:', resp.status);
+    const data = await HandleResp(resp);
+    console.log('创建问诊会话响应:', data);
+    return data;
 }
 
-export async function listConsultations(params = {}) {
+export async function ListConsultations(params = {}) {
     const query = new URLSearchParams();
     if (params.status) query.append('status', params.status);
     if (params.page) query.append('page', params.page);
     if (params.page_size) query.append('page_size', params.page_size);
-    const headers = getAuthHeaders();
+    const headers = GetAuthHeaders();
     const qs = query.toString();
-    const resp = await fetch(`${API_BASE}/consultations/${qs ? `?${qs}` : ''}`, { method: 'GET', headers, redirect: 'follow' });
-    return handleResp(resp);
+    const url = qs ? `${API_BASE}/consultations/?${qs}` : `${API_BASE}/consultations/`;
+    console.log('获取问诊列表 URL:', url);
+    const resp = await fetch(url, { method: 'GET', headers, redirect: 'follow' });
+    const data = await HandleResp(resp);
+    console.log('获取问诊列表响应:', data);
+    return data;
 }
 
-export async function getConsultationDetail(consultationId, params = {}) {
+export async function GetConsultationDetail(consultationId, params = {}) {
     if (!consultationId) throw new Error('consultationId is required');
     const query = new URLSearchParams();
     if (params.page) query.append('page', params.page);
     if (params.page_size) query.append('page_size', params.page_size);
-    const headers = getAuthHeaders();
+    const headers = GetAuthHeaders();
     const qs = query.toString();
-    const resp = await fetch(`${API_BASE}/consultations/${consultationId}${qs ? `?${qs}` : ''}`, { method: 'GET', headers, redirect: 'follow' });
-    return handleResp(resp);
+    const url = qs
+        ? `${API_BASE}/consultations/${consultationId}/?${qs}`
+        : `${API_BASE}/consultations/${consultationId}/`;
+    console.log('获取问诊详情 URL:', url);
+    const resp = await fetch(url, { method: 'GET', headers, redirect: 'follow' });
+    const data = await HandleResp(resp);
+    console.log('获取问诊详情响应:', data);
+    return data;
 }
 
-export async function sendConsultationMessage(consultationId, { text }) {
+export async function SendConsultationMessage(consultationId, { text }) {
     if (!consultationId) throw new Error('consultationId is required');
-    const headers = getAuthHeaders();
+    const headers = GetAuthHeaders();
     headers.append('Content-Type', 'application/json');
     const body = JSON.stringify({ text });
-    const resp = await fetch(`${API_BASE}/consultations/${consultationId}/messages`, { method: 'POST', headers, body, redirect: 'follow' });
-    return handleResp(resp);
+    const url = `${API_BASE}/consultations/${consultationId}/messages/`;
+    console.log('发送消息 URL:', url);
+    console.log('发送消息 body:', body);
+    const resp = await fetch(url, { method: 'POST', headers, body, redirect: 'follow' });
+    console.log('发送消息 HTTP 状态码:', resp.status);
+    const data = await HandleResp(resp);
+    console.log('发送消息响应:', data);
+    return data;
 }
 
-export async function closeConsultation(consultationId) {
+export async function CloseConsultation(consultationId) {
     if (!consultationId) throw new Error('consultationId is required');
-    const headers = getAuthHeaders();
-    const resp = await fetch(`${API_BASE}/consultations/${consultationId}/close`, { method: 'POST', headers, redirect: 'follow' });
-    return handleResp(resp);
+    const headers = GetAuthHeaders();
+    const url = `${API_BASE}/consultations/${consultationId}/close/`;
+    console.log('关闭问诊会话 URL:', url);
+    const resp = await fetch(url, { method: 'POST', headers, redirect: 'follow' });
+    const data = await HandleResp(resp);
+    console.log('关闭问诊会话响应:', data);
+    return data;
 }
 
 const consultationApi = {
-    createConsultation,
-    listConsultations,
-    getConsultationDetail,
-    sendConsultationMessage,
-    closeConsultation,
+    CreateConsultation,
+    ListConsultations,
+    GetConsultationDetail,
+    SendConsultationMessage,
+    CloseConsultation,
 };
 
 export default consultationApi;

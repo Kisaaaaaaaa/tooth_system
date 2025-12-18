@@ -2,7 +2,7 @@
 // Each function returns parsed JSON when possible, or raw text otherwise.
 
 // 使用后端 API 地址
-const API_BASE = 'http://10.78.120.72:8000/api'; // root; change if backend is mounted under a prefix
+const API_BASE = 'http://localhost:8000/api'; // root; change if backend is mounted under a prefix
 
 function handleResponse(res) {
   const ct = res.headers.get('content-type') || '';
