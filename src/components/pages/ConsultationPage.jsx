@@ -1,10 +1,10 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
-import { Send, Loader2, AlertCircle, ArrowLeft, ShieldAlert } from 'lucide-react';
+import { Send, Loader2, AlertCircle, ArrowLeft, ShieldAlert, RefreshCw } from 'lucide-react';
 import consultationApi from '../../api/consultations';
 import doctorsApi from '../../api/doctors';
 import hospitalsApi from '../../api/hospitals';
-import { MOCK_HOSPITALS, MOCK_CONSULTATION_HISTORIES } from '../../data/mockData';
+
 
 // 在线问诊页面
 const ConsultationPage = ({ currentDoctor, consultationAuthRequired = false }) => {
@@ -77,40 +77,40 @@ const ConsultationPage = ({ currentDoctor, consultationAuthRequired = false }) =
         loadDoctor();
     }, [doctorId, doctor]);
 
-    // 当医生信息更新时，检查是否需要添加到侧边栏聊天记录
-    useEffect(() => {
-        if (!doctor) return;
+    // // 当医生信息更新时，检查是否需要添加到侧边栏聊天记录
+    // useEffect(() => {
+    //     if (!doctor) return;
 
-        // 检查该医生是否已在聊天记录中
-        const isDoctorInHistory = consultationHistories.some(
-            history => history.doctor_id === doctor.id
-        );
+    //     // 检查该医生是否已在聊天记录中
+    //     const isDoctorInHistory = consultationHistories.some(
+    //         history => history.doctor_id === doctor.id
+    //     );
 
-        if (!isDoctorInHistory) {
-            // 创建新的聊天记录项
-            const newHistory = {
-                consultation_id: Date.now(),
-                doctor_id: doctor.id,
-                doctor_name: doctor.name,
-                doctor_avatar: doctor.avatar,
-                doctor_title: doctor.title,
-                doctor_hospital: hospitals.find(hospital => hospital.id === doctor.hospital_id)?.name || '未知医院',
-                last_message: '',
-                last_time: '',
-                unread: 0,
-                messages: [],
-                last_active_time: Date.now() // 设置当前时间为活动时间
-            };
+    //     if (!isDoctorInHistory) {
+    //         // 创建新的聊天记录项
+    //         const newHistory = {
+    //             consultation_id: Date.now(),
+    //             doctor_id: doctor.id,
+    //             doctor_name: doctor.name,
+    //             doctor_avatar: doctor.avatar,
+    //             doctor_title: doctor.title,
+    //             doctor_hospital: hospitals.find(hospital => hospital.id === doctor.hospital_id)?.name || '未知医院',
+    //             last_message: '',
+    //             last_time: '',
+    //             unread: 0,
+    //             messages: [],
+    //             last_active_time: Date.now() // 设置当前时间为活动时间
+    //         };
 
-            // 添加到侧边栏聊天记录并保持排序
-            setConsultationHistories(prev => {
-                const updated = [...prev, newHistory];
-                // 按活动时间降序排序
-                updated.sort((a, b) => b.last_active_time - a.last_active_time);
-                return updated;
-            });
-        }
-    }, [doctor, consultationHistories]);
+    //         // 添加到侧边栏聊天记录并保持排序
+    //         setConsultationHistories(prev => {
+    //             const updated = [...prev, newHistory];
+    //             // 按活动时间降序排序
+    //             updated.sort((a, b) => b.last_active_time - a.last_active_time);
+    //             return updated;
+    //         });
+    //     }
+    // }, [doctor, consultationHistories]);
 
     // 加载医院数据
     useEffect(() => {
@@ -122,45 +122,98 @@ const ConsultationPage = ({ currentDoctor, consultationAuthRequired = false }) =
                 const hospitalsData = resp.data?.results || resp.results || [];
                 setHospitals(hospitalsData);
             } catch (err) {
-                console.error('加载医院数据失败，使用本地数据:', err);
-                // 如果API请求失败，使用本地数据
-                setHospitals(MOCK_HOSPITALS);
+                console.error('加载医院数据失败:', err);
+                setHospitals([]);
             }
         };
 
         loadHospitals();
     }, []);
 
-    // 加载会诊历史记录
+    // // 加载会诊历史记录
+    // useEffect(() => {
+    //     const loadConsultationHistories = async () => {
+    //         try {
+    //             const resp = await consultationApi.ListConsultations();
+    //             const histories = resp.data?.results || [];
+
+    //             // 为每个历史记录添加last_active_time字段用于排序
+    //             const sortedHistories = histories.map(item => ({
+    //                 ...item,
+    //                 last_active_time: Date.now() - Math.random() * 1000000 // 暂时使用随机值，实际应该从API获取
+    //             }));
+
+    //             // 按活动时间降序排序
+    //             sortedHistories.sort((a, b) => b.last_active_time - a.last_active_time);
+
+    //             setConsultationHistories(sortedHistories);
+    //         } catch (err) {
+    //             console.error('加载会诊历史记录失败:', err);
+    //             setConsultationHistories([]);
+    //         }
+    //     };
+
+    //     loadConsultationHistories();
+    // }, []);
     useEffect(() => {
         const loadConsultationHistories = async () => {
             try {
-                const resp = await consultationApi.listConsultations();
-                const histories = resp.data || resp;
+                const resp = await consultationApi.ListConsultations();
+                const list = resp.data?.results || [];
 
-                // 为每个历史记录添加last_active_time字段用于排序
-                const sortedHistories = histories.map(item => ({
-                    ...item,
-                    last_active_time: Date.now() - Math.random() * 1000000 // 暂时使用随机值，实际应该从API获取
-                }));
+                // 拉医生信息补全左边展示
+                const enriched = await Promise.all(
+                    list.map(async (c) => {
+                        try {
+                            const detail = await consultationApi.GetConsultationDetail(c.id);
+                            const msgs = detail.data?.messages?.results || [];
 
-                // 按活动时间降序排序
-                sortedHistories.sort((a, b) => b.last_active_time - a.last_active_time);
+                            // ⭐ 核心过滤条件
+                            if (msgs.length === 0) return null;
 
-                setConsultationHistories(sortedHistories);
+                            const dResp = await doctorsApi.getDoctorDetail(c.doctor_id);
+                            const d = dResp.data || dResp;
+
+                            return {
+                                id: c.id,
+                                doctor_id: c.doctor_id,
+                                doctor_name: d.name,
+                                doctor_avatar: d.avatar,
+                                last_message: msgs[msgs.length - 1]?.text || '',
+                                last_time: msgs[msgs.length - 1]?.time || '',
+                            };
+                        } catch {
+                            return null;
+                        }
+                    })
+                );
+
+                setConsultationHistories(enriched.filter(Boolean));
             } catch (err) {
-                console.error('加载会诊历史记录失败，使用本地数据:', err);
-                // 如果API请求失败，使用本地数据
-                const sortedMockHistories = MOCK_CONSULTATION_HISTORIES.map(item => ({
-                    ...item,
-                    last_active_time: Date.now() - Math.random() * 1000000
-                })).sort((a, b) => b.last_active_time - a.last_active_time);
-                setConsultationHistories(sortedMockHistories);
+                console.error('加载会诊历史失败', err);
+                setConsultationHistories([]);
             }
         };
 
         loadConsultationHistories();
     }, []);
+    // ⭐ 自动续聊：如果已存在与该医生的会诊，自动打开
+    useEffect(() => {
+        if (!doctorId || consultationHistories.length === 0) return;
+
+        const existing = consultationHistories.find(
+            h => h && h.doctor_id === doctorId
+        );
+
+        if (existing) {
+            setConsultationId(existing.id);
+            fetchMessages(existing.id);
+        } else {
+            setConsultationId(null);
+            setMessages([]);
+        }
+    }, [doctorId, consultationHistories]);
+
 
     // 创建会话并拉取消息
     useEffect(() => {
@@ -170,7 +223,10 @@ const ConsultationPage = ({ currentDoctor, consultationAuthRequired = false }) =
                 setError('当前问诊需登录后使用，请先登录。');
                 return;
             }
-            await ensureSessionAndMessages();
+            // await ensureSessionAndMessages();
+            if (consultationId) {
+                await fetchMessages(consultationId);
+            }
         };
         bootstrap();
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -180,7 +236,7 @@ const ConsultationPage = ({ currentDoctor, consultationAuthRequired = false }) =
         try {
             if (!consultationId) {
                 setCreating(true);
-                const resp = await consultationApi.createConsultation({ doctor_id: doctorId });
+                const resp = await consultationApi.CreateConsultation({ doctor_id: doctorId });
                 const newId = resp.data?.id || resp.id;
                 setConsultationId(newId);
                 setCreating(false);
@@ -202,7 +258,7 @@ const ConsultationPage = ({ currentDoctor, consultationAuthRequired = false }) =
         setLoading(true);
         setError('');
         try {
-            const resp = await consultationApi.getConsultationDetail(id, { page_size: 100 });
+            const resp = await consultationApi.GetConsultationDetail(id, { page_size: 100 });
             const remoteMessages = resp.data?.messages?.results || resp.data?.messages || resp.messages || [];
             setMessages(remoteMessages.map((m, idx) => ({
                 id: m.id || idx,
@@ -241,7 +297,7 @@ const ConsultationPage = ({ currentDoctor, consultationAuthRequired = false }) =
         let activeId = consultationId;
         try {
             if (!activeId) {
-                const resp = await consultationApi.createConsultation({ doctor_id: doctorId });
+                const resp = await consultationApi.CreateConsultation({ doctor_id: doctorId });
                 activeId = resp.data?.id || resp.id;
                 setConsultationId(activeId);
             }
@@ -249,6 +305,28 @@ const ConsultationPage = ({ currentDoctor, consultationAuthRequired = false }) =
             const tempMessage = { id: `temp-${Date.now()}`, sender: 'user', text: content, time: formatNow(), pending: true };
             setMessages((prev) => [...prev, tempMessage]);
             setInput('');
+            //先保证左侧存在这条会诊
+            setConsultationHistories(prev => {
+                const exists = prev?.some(
+                    item => item && item.doctor_id === doctorId
+                );
+
+                if (exists) return prev;
+
+                return [
+                    {
+                        id: activeId,
+                        doctor_id: doctorId,
+                        doctor_name: doctor?.name,
+                        doctor_avatar: doctor?.avatar,
+                        unread: 0,
+                        last_message: content,
+                        last_time: formatNow(),
+                        last_active_time: Date.now()
+                    },
+                    ...(prev || [])
+                ];
+            });
 
             // 更新当前聊天记录的时间，确保它保持在顶部
             const now = Date.now();
@@ -270,7 +348,7 @@ const ConsultationPage = ({ currentDoctor, consultationAuthRequired = false }) =
                 return updated;
             });
 
-            const resp = await consultationApi.sendConsultationMessage(activeId, { text: content });
+            const resp = await consultationApi.SendConsultationMessage(activeId, { text: content });
             const saved = resp.data || resp;
             setMessages((prev) => prev.map((m) => (m.id === tempMessage.id ? {
                 id: saved.id || tempMessage.id,
@@ -351,59 +429,74 @@ const ConsultationPage = ({ currentDoctor, consultationAuthRequired = false }) =
                     </button>
                 </div>
                 <div className="flex-1 overflow-y-auto">
-                    {consultationHistories.map((history) => {
-                        const isActive = history.doctor_id === doctorId;
-                        return (
-                            <div
-                                key={history.consultation_id}
-                                onClick={() => {
-                                    // 切换到选中的医生会话
-                                    setDoctor({
-                                        id: history.doctor_id,
-                                        name: history.doctor_name,
-                                        avatar: history.doctor_avatar,
-                                        title: history.doctor_title,
-                                        specialty: '口腔医疗',
-                                        hospital_id: hospitals.find(hospital => hospital.id === doctor.hospital_id)?.id || null,
-                                    });
-                                    setMessages(history.messages);
+                    {consultationHistories
+                        .filter(h => h && h.doctor_id)
+                        .map((history) => {
+                            const isActive = history.doctor_id === doctorId;
+                            return (
+                                <div
+                                    key={history.id || history.consultation_id}
+                                    // onClick={async () => {
+                                    //     try {
 
-                                    // 更新活动时间并置顶
-                                    const now = Date.now();
-                                    setConsultationHistories(prev => {
-                                        const updated = prev.map(item =>
-                                            item.doctor_id === history.doctor_id
-                                                ? { ...item, unread: 0, last_active_time: now + 1000000000 } // 设置一个极高的时间值确保置顶
-                                                : item
-                                        );
+                                    //         const resp = await doctorsApi.getDoctorDetail(history.doctor_id);
+                                    //         const doctorData = resp.data || resp;
 
-                                        // 按活动时间降序重新排序
-                                        updated.sort((a, b) => b.last_active_time - a.last_active_time);
-                                        return updated;
-                                    });
-                                }}
-                                className={`p-3 cursor-pointer border-b border-slate-100 hover:bg-slate-50 transition ${isActive ? 'bg-cyan-50 border-l-4 border-cyan-500' : ''}`}
-                            >
-                                <div className="flex items-center gap-3">
-                                    <img src={history.doctor_avatar} alt={history.doctor_name} className="w-10 h-10 rounded-full object-cover" />
-                                    {sidebarOpen && (
-                                        <div className="flex-1 min-w-0">
-                                            <div className="flex items-center justify-between">
-                                                <h4 className="font-medium text-slate-800 truncate">{history.doctor_name}</h4>
-                                                <span className="text-xs text-slate-400">{history.last_time}</span>
+                                    //         setDoctor(doctorData);
+                                    //         setConsultationId(history.id || history.consultation_id || null);
+                                    //         setMessages([]); // 由后续 fetchMessages 拉取
+
+
+                                    //         const now = Date.now();
+                                    //         setConsultationHistories(prev => {
+                                    //             const updated = prev.map(item =>
+                                    //                 item.doctor_id === history.doctor_id
+                                    //                     ? { ...item, unread: 0, last_active_time: now + 1000000000 }
+                                    //                     : item
+                                    //             );
+                                    //             updated.sort((a, b) => b.last_active_time - a.last_active_time);
+                                    //             return updated;
+                                    //         });
+                                    //     } catch (e) {
+                                    //         console.error('切换医生失败', e);
+                                    //     }
+                                    // }}
+                                    onClick={async () => {
+                                        try {
+                                            setConsultationId(history.id);
+                                            setMessages([]);
+
+                                            const resp = await doctorsApi.getDoctorDetail(history.doctor_id);
+                                            setDoctor(resp.data || resp);
+
+                                            await fetchMessages(history.id);
+                                        } catch (e) {
+                                            console.error('切换会诊失败', e);
+                                        }
+                                    }}
+
+                                    className={`p-3 cursor-pointer border-b border-slate-100 hover:bg-slate-50 transition ${isActive ? 'bg-cyan-50 border-l-4 border-cyan-500' : ''}`}
+                                >
+                                    <div className="flex items-center gap-3">
+                                        <img src={history.doctor_avatar} alt={history.doctor_name} className="w-10 h-10 rounded-full object-cover" />
+                                        {sidebarOpen && (
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex items-center justify-between">
+                                                    <h4 className="font-medium text-slate-800 truncate">{history.doctor_name}</h4>
+                                                    <span className="text-xs text-slate-400">{history.last_time}</span>
+                                                </div>
+                                                <div className="flex items-center gap-2 mt-1">
+                                                    <span className="text-xs text-slate-500 truncate">{history.last_message}</span>
+                                                    {history.unread > 0 && (
+                                                        <span className="bg-red-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center">{history.unread}</span>
+                                                    )}
+                                                </div>
                                             </div>
-                                            <div className="flex items-center gap-2 mt-1">
-                                                <span className="text-xs text-slate-500 truncate">{history.last_message}</span>
-                                                {history.unread > 0 && (
-                                                    <span className="bg-red-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center">{history.unread}</span>
-                                                )}
-                                            </div>
-                                        </div>
-                                    )}
+                                        )}
+                                    </div>
                                 </div>
-                            </div>
-                        );
-                    })}
+                            );
+                        })}
                 </div>
             </div>
         );
@@ -528,9 +621,9 @@ const ConsultationPage = ({ currentDoctor, consultationAuthRequired = false }) =
     const disableInput = sending || loading || !doctorId || (consultationAuthRequired && !isAuthed());
 
     return (
-        <div className="h-[calc(100vh-140px)] flex bg-slate-50 animate-fade-in">
+        <div className="flex bg-slate-50 animate-fade-in overflow-hidden" style={{ height: 'calc(100vh - 64px)' }}>
             {/* 侧边栏 */}
-            <div className="md:block hidden">
+            <div className="md:block hidden h-full">
                 {renderSidebar()}
             </div>
 
@@ -549,33 +642,98 @@ const ConsultationPage = ({ currentDoctor, consultationAuthRequired = false }) =
                 {renderSidebar()}
             </div>
 
-            {/* 主内容区 */}
-            <div className={`flex-1 flex flex-col overflow-hidden transition-all duration-300 ${sidebarOpen ? 'ml-0' : 'ml-0'}`}>
-                <div className="p-4 overflow-hidden">
+            {/* 主内容区 - 固定高度布局 */}
+            <div className="flex-1 flex flex-col h-full">
+                {/* 顶部医生卡片 */}
+                <div className="bg-white p-4 border-b border-slate-200 flex-shrink-0">
                     {renderDoctorCard()}
                 </div>
 
-                <div className="flex-1 bg-white rounded-2xl overflow-hidden shadow-sm border border-slate-200 flex flex-col mx-4 mb-4">
+                {/* 聊天容器 */}
+                <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
                     {/* Header */}
-                    <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-white">
+                    <div className="p-3 bg-white border-b border-slate-100 flex justify-between items-center flex-shrink-0">
                         <div className="text-sm text-slate-700">
                             {doctor ? `正在与 ${doctor.name} 医生沟通` : '请选择医生后开始问诊'}
                         </div>
-                        {consultationAuthRequired && !isAuthed() && (
-                            <div className="flex items-center gap-1 text-amber-600 text-xs">
-                                <ShieldAlert size={14} /> 登录后才可发送
+                        <div className="flex items-center gap-3">
+                            {consultationAuthRequired && !isAuthed() && (
+                                <div className="flex items-center gap-1 text-amber-600 text-xs">
+                                    <ShieldAlert size={14} /> 登录后才可发送
+                                </div>
+                            )}
+                            <button
+                                onClick={() => navigate('/doctors')}
+                                className="flex items-center gap-2 text-sm px-3 py-1 rounded-md bg-gradient-to-r from-cyan-500 to-blue-500 text-white hover:from-cyan-600 hover:to-blue-600 shadow-md transition-transform transform hover:-translate-y-0.5"
+                            >
+                                <RefreshCw size={16} />
+                                <span>换个医生咨询</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* 消息区域 - 可滚动，占据剩余空间 */}
+                    <div
+                        ref={listRef}
+                        className="flex-1 overflow-y-auto bg-slate-50"
+                        style={{
+                            scrollBehavior: 'smooth',
+                            overflowAnchor: 'auto'
+                        }}
+                    >
+                        {loading ? (
+                            <div className="flex items-center justify-center h-full">
+                                <div className="flex items-center gap-2 text-slate-500">
+                                    <Loader2 className="animate-spin text-cyan-600" size={20} />
+                                    <span>加载历史消息...</span>
+                                </div>
+                            </div>
+                        ) : error && !messages.length ? (
+                            <div className="flex flex-col items-center justify-center h-full text-slate-500">
+                                <AlertCircle className="text-amber-500 mb-2" size={24} />
+                                <p>{error}</p>
+                            </div>
+                        ) : !messages.length ? (
+                            <div className="flex flex-col items-center justify-center h-full text-slate-500">
+                                <p>暂无历史消息，开始问诊吧</p>
+                            </div>
+                        ) : (
+                            <div className="p-4 space-y-6">
+                                {groupMessagesByTime().map((group, groupIndex) => (
+                                    <div key={groupIndex} className="space-y-3">
+                                        {/* 时间分隔 */}
+                                        <div className="flex justify-center">
+                                            <div className="px-3 py-1 bg-slate-200 rounded-full text-xs text-slate-600">
+                                                {group.time}
+                                            </div>
+                                        </div>
+
+                                        {/* 消息列表 */}
+                                        <div className="space-y-3">
+                                            {group.messages.map((msg) => (
+                                                <div key={msg.id} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
+                                                    <div className={`max-w-[80%] p-3 rounded-2xl text-sm ${msg.sender === 'user' ? 'bg-cyan-500 text-white rounded-tr-none' : 'bg-white border border-slate-200 text-slate-700 rounded-tl-none'}`}>
+                                                        {msg.text || '（空消息）'}
+                                                        {msg.pending && <span className="text-[10px] mt-1 text-right text-cyan-100"> · 发送中</span>}
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                ))}
                             </div>
                         )}
                     </div>
 
-                    {/* Messages */}
-                    {renderMessages()}
-
-                    {/* Input */}
-                    <div className="p-4 bg-white border-t border-slate-100 flex flex-col gap-2">
-                        {error && <div className="text-xs text-amber-600 flex items-center gap-1"><AlertCircle size={14} />{error}</div>}
-                        <div className="flex gap-3 items-end">
-                            <div className="flex-1 flex items-center bg-white border border-slate-200 rounded-full p-4 hover:border-cyan-200 transition-all focus-within:border-cyan-500 focus-within:shadow-lg">
+                    {/* 输入框 - 固定在底部 */}
+                    <div className="bg-white border-t border-slate-100 p-3 flex-shrink-0">
+                        {error && (
+                            <div className="text-xs text-amber-600 flex items-center gap-1 mb-2">
+                                <AlertCircle size={14} />{error}
+                            </div>
+                        )}
+                        <div className="flex gap-3 items-center">
+                            <div className="flex-1 flex items-center bg-white border border-slate-200 rounded-full px-4 py-2 hover:border-cyan-200 transition-all focus-within:border-cyan-500 focus-within:shadow-lg">
                                 <input
                                     type="text"
                                     value={input}
@@ -589,13 +747,13 @@ const ConsultationPage = ({ currentDoctor, consultationAuthRequired = false }) =
                             <button
                                 onClick={handleSend}
                                 disabled={disableInput}
-                                className="bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 disabled:bg-slate-300 text-white px-6 py-3.5 rounded-full transition-all shadow-lg shadow-cyan-200/50 flex items-center justify-center gap-2 transform hover:scale-105 active:scale-95 hover:shadow-xl"
+                                className="bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 disabled:bg-slate-300 text-white px-5 py-2.5 rounded-full transition-all shadow-lg shadow-cyan-200/50 flex items-center justify-center gap-2 transform hover:scale-105 active:scale-95 hover:shadow-xl"
                             >
                                 {sending ? <Loader2 className="animate-spin" size={16} /> : <Send size={18} />}
                                 <span className="text-sm font-semibold">发送</span>
                             </button>
                         </div>
-                        {creating && <p className="text-[11px] text-slate-400">正在创建会话...</p>}
+                        {creating && <p className="text-[11px] text-slate-400 mt-2">正在创建会话...</p>}
                     </div>
                 </div>
             </div>

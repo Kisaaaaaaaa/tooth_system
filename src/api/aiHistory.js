@@ -26,15 +26,15 @@ async function handleResp(resp) {
     if (!resp.ok) {
         // 尝试解析错误信息，提取用户友好的提示
         let errorMessage = '';
-        
+
         if (body.message) {
             try {
                 const messageStr = body.message;
                 const errors = [];
-                
+
                 // 直接使用正则表达式提取所有中文错误信息
                 const errorMatches = messageStr.match(/'([^']*[\u4e00-\u9fa5]+[^']*)'/g);
-                
+
                 if (errorMatches) {
                     // 移除引号并将所有错误信息合并
                     errorMatches.forEach(match => {
@@ -50,12 +50,12 @@ async function handleResp(resp) {
                 errorMessage = body.message;
             }
         }
-        
+
         // 如果没有提取到错误信息，使用默认的错误提示
         if (!errorMessage) {
             errorMessage = `${resp.status} ${resp.statusText}`;
         }
-        
+
         const err = new Error(errorMessage);
         err.status = resp.status;
         err.body = body;
@@ -76,7 +76,7 @@ async function handleResp(resp) {
 export async function saveHistoryItem(historyItem) {
     const headers = getAuthHeaders();
     headers.append('Content-Type', 'application/json');
-    
+
     const body = JSON.stringify(historyItem);
     const resp = await fetch(API_ROOT + '/ai/history', {
         method: 'POST',
@@ -84,7 +84,7 @@ export async function saveHistoryItem(historyItem) {
         body,
         redirect: 'follow'
     });
-    
+
     return handleResp(resp);
 }
 
@@ -99,13 +99,13 @@ export async function getHistoryList(params = {}) {
     const qs = buildQuery(params);
     const url = `/ai/history${qs}`;
     const headers = getAuthHeaders();
-    
+
     const resp = await fetch(API_ROOT + url, {
         method: 'GET',
         headers,
         redirect: 'follow'
     });
-    
+
     return handleResp(resp);
 }
 
@@ -121,7 +121,7 @@ export async function deleteHistoryItem(id) {
         headers,
         redirect: 'follow'
     });
-    
+
     return handleResp(resp);
 }
 
@@ -136,7 +136,7 @@ export async function clearHistoryList() {
         headers,
         redirect: 'follow'
     });
-    
+
     return handleResp(resp);
 }
 

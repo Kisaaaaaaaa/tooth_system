@@ -84,8 +84,8 @@ export async function getConsultationSessions(params = {}) {
 export async function getConsultationDetail(consultationId, params = {}) {
     try {
         const queryStr = new URLSearchParams(params).toString();
-        const url = queryStr 
-            ? `${API_BASE}/consultations/${consultationId}/?${queryStr}` 
+        const url = queryStr
+            ? `${API_BASE}/consultations/${consultationId}/?${queryStr}`
             : `${API_BASE}/consultations/${consultationId}/`;
         const response = await fetch(url, {
             method: 'GET',
@@ -127,7 +127,7 @@ export async function sendMessage(consultationId, text) {
         const url = `${API_BASE}/consultations/${consultationId}/messages/`;
         console.log('发送消息 URL:', url);
         console.log('发送消息 body:', messageData);
-        
+
         const response = await fetch(url, {
             method: 'POST',
             headers: getAuthHeader(),
@@ -136,14 +136,14 @@ export async function sendMessage(consultationId, text) {
         });
 
         console.log('发送消息 HTTP 状态码:', response.status);
-        
+
         const data = await response.json();
         console.log('发送消息 响应数据:', data);
-        
+
         if (!response.ok) {
             console.error('HTTP 请求失败，状态码:', response.status);
         }
-        
+
         return data;
     } catch (error) {
         console.error('发送消息异常:', error);
