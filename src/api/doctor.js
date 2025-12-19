@@ -38,6 +38,44 @@ function getCurrentUser() {
 import { resolveMediaUrl } from './utils';
 
 /**
+ * 医生申请入驻
+ * @param {{name: string, title: string, specialty: string, hospital_id?: number}} payload
+ * @returns {Promise<Object>} 标准后端响应或已解包的数据
+ */
+export async function applyDoctor(payload = {}) {
+    const token = localStorage.getItem('access_token') || localStorage.getItem('authToken');
+    const headers = {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+    };
+
+    const res = await fetch(`${API_BASE}/doctors/apply/`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+            name: payload.name,
+            title: payload.title,
+            specialty: payload.specialty,
+            ...(payload.hospital_id ? { hospital_id: payload.hospital_id } : {}),
+            ...(payload.avatar ? { avatar: payload.avatar } : {}),
+            ...(payload.introduction ? { introduction: payload.introduction } : {}),
+            ...(payload.education ? { education: payload.education } : {}),
+            ...(payload.experience ? { experience: payload.experience } : {}),
+        }),
+        redirect: 'follow'
+    });
+
+    const text = await res.text();
+    const data = handleResponse(text);
+    if (!res.ok) {
+        const msg = (data && (data.message || data.detail)) || `HTTP ${res.status}`;
+        throw new Error(typeof msg === 'string' ? msg : JSON.stringify(msg));
+    }
+    return data;
+}
+
+/**
  * 获取医生详情
  * @returns {Promise<Object>}
  */

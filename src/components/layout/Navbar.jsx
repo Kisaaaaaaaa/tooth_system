@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import api from '../../api/auth';
 import { resolveMediaUrl } from '../../api/utils';
+import { getDoctorAudits } from '../../api/admin';
 
 // 顶部导航栏组件
 const Navbar = ({ currentPage, navigateTo }) => {
@@ -24,13 +25,17 @@ const Navbar = ({ currentPage, navigateTo }) => {
         'doctorProfile': '个人信息'
     };
 
-    // 管理员菜单
+    // 管理员菜单（顶部导航快捷入口）
     const adminPageLabels = {
-        'admin': '管理员面板'
+        'admin': '总览',
+        'admin/doctors': '医生审核',
+        'admin/hospitals': '医院管理',
+        'admin/users': '用户管理'
     };
 
     const [user, setUser] = useState(null);
     const [role, setRole] = useState(null);
+    const [pendingDoctorsCount, setPendingDoctorsCount] = useState(0);
 
     // 检查登录状态
     const checkLoginStatus = () => {
@@ -78,6 +83,21 @@ const Navbar = ({ currentPage, navigateTo }) => {
         }
     };
 
+    // 获取待审核医生数量
+    const fetchPendingDoctorsCount = async () => {
+        if (role !== 'admin') return;
+        
+        try {
+            const result = await getDoctorAudits({ status: 'pending', page: 1, page_size: 1 });
+            if (result && typeof result.count === 'number') {
+                setPendingDoctorsCount(result.count);
+                console.log('[Navbar] 待审核医生数量:', result.count);
+            }
+        } catch (error) {
+            console.error('[Navbar] 获取待审核医生数量失败:', error);
+        }
+    };
+
     useEffect(() => {
         // 组件挂载时检查登录状态
         console.log('[Navbar] 组件挂载，首次检查登录状态');
@@ -108,6 +128,28 @@ const Navbar = ({ currentPage, navigateTo }) => {
             window.removeEventListener('focus', onFocus);
         };
     }, []);
+
+    // 当角色变为管理员时，获取待审核医生数量
+    useEffect(() => {
+        if (role === 'admin') {
+            fetchPendingDoctorsCount();
+            
+            // 每30秒刷新一次待审核数量
+            const interval = setInterval(fetchPendingDoctorsCount, 30000);
+            
+            // 监听医生审核更新事件
+            const handleAuditUpdate = () => {
+                console.log('[Navbar] 检测到医生审核更新，刷新待审核数量');
+                fetchPendingDoctorsCount();
+            };
+            window.addEventListener('doctorAuditUpdated', handleAuditUpdate);
+            
+            return () => {
+                clearInterval(interval);
+                window.removeEventListener('doctorAuditUpdated', handleAuditUpdate);
+            };
+        }
+    }, [role]);
 
     const handleLogout = async () => {
         console.log('=== Navbar登出函数开始执行 ===');
@@ -152,9 +194,15 @@ const Navbar = ({ currentPage, navigateTo }) => {
                                 <button
                                     key={page}
                                     onClick={() => navigateTo(page)}
-                                    className={`hover:text-cyan-600 transition ${currentPage === page ? 'text-cyan-600 font-bold' : ''}`}
+                                    className={`hover:text-cyan-600 transition relative ${currentPage === page ? 'text-cyan-600 font-bold' : ''}`}
                                 >
                                     {label}
+                                    {/* 医生审核页面显示待审核数量红点 */}
+                                    {page === 'admin/doctors' && pendingDoctorsCount > 0 && (
+                                        <span className="absolute -top-2 -right-3 bg-red-500 text-white text-xs rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1 font-bold shadow-md">
+                                            {pendingDoctorsCount > 99 ? '99+' : pendingDoctorsCount}
+                                        </span>
+                                    )}
                                 </button>
                             ))
                             : role === 'doctor' 

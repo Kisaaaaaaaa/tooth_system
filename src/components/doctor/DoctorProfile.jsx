@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Save, X, Mail } from 'lucide-react';
+import { Save, X, Mail, Wifi, WifiOff } from 'lucide-react';
 import doctorApi from '../../api/doctor';
 import api from '../../api/auth';
 
@@ -38,6 +38,7 @@ const DoctorProfile = () => {
     const [countdown, setCountdown] = useState(0); // 验证码倒计时
     const [verifying, setVerifying] = useState(false); // 验证中的加载状态
     const [changePassword, setChangePassword] = useState(false); // 是否启用修改密码
+    const [togglingOnline, setTogglingOnline] = useState(false); // 切换在线状态中
 
     useEffect(() => {
         fetchDoctorProfile();
@@ -174,6 +175,26 @@ const DoctorProfile = () => {
             window.dispatchEvent(new Event('localStorageUpdated'));
         } catch (e) {
             console.warn('同步本地用户信息失败:', e);
+        }
+    };
+
+    const handleToggleOnline = async () => {
+        if (togglingOnline) return;
+        
+        const newStatus = !doctor?.is_online;
+        setTogglingOnline(true);
+        setError(null);
+        
+        try {
+            const res = await doctorApi.setDoctorOnlineStatus(newStatus);
+            // 更新本地状态
+            setDoctor(prev => ({ ...prev, is_online: newStatus }));
+            console.log('在线状态已更新为:', newStatus);
+        } catch (err) {
+            console.error('切换在线状态失败:', err);
+            setError(err.message || '切换在线状态失败');
+        } finally {
+            setTogglingOnline(false);
         }
     };
 
@@ -512,12 +533,37 @@ const DoctorProfile = () => {
             <div className="flex items-center justify-between">
                 <h1 className="text-2xl font-bold text-slate-800">个人信息</h1>
                 {!isEditing && (
-                    <button
-                        onClick={() => setIsEditing(true)}
-                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
-                    >
-                        编辑信息
-                    </button>
+                    <div className="flex gap-3">
+                        <button
+                            onClick={handleToggleOnline}
+                            disabled={togglingOnline}
+                            className={`px-4 py-2 rounded-lg transition shadow-sm flex items-center gap-2 ${
+                                doctor?.is_online 
+                                    ? 'bg-orange-600 text-white hover:bg-orange-700' 
+                                    : 'bg-green-600 text-white hover:bg-green-700'
+                            } ${togglingOnline ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        >
+                            {togglingOnline ? (
+                                <span>切换中...</span>
+                            ) : doctor?.is_online ? (
+                                <>
+                                    <WifiOff size={18} />
+                                    <span>设为离线</span>
+                                </>
+                            ) : (
+                                <>
+                                    <Wifi size={18} />
+                                    <span>设为在线</span>
+                                </>
+                            )}
+                        </button>
+                        <button
+                            onClick={() => setIsEditing(true)}
+                            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+                        >
+                            编辑信息
+                        </button>
+                    </div>
                 )}
             </div>
 

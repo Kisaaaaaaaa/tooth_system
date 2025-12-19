@@ -6,30 +6,37 @@ const UserManagement = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [filter, setFilter] = useState('all'); // all, blacklisted, normal
+  const [keyword, setKeyword] = useState('');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [totalCount, setTotalCount] = useState(0);
 
   // 获取用户列表
   const fetchUsers = async () => {
     setLoading(true);
     setError(null);
     try {
-      // 在真实场景中调用API
-      // const usersData = await adminApi.getUsers();
-      
-      // 使用模拟数据
-      const mockUsers = [];
-      for (let i = 1; i <= 15; i++) {
-        mockUsers.push({
-          id: i,
-          name: `用户${i}`,
-          phone: `1380000${100 + i}`,
-          missedSignIns: Math.floor(Math.random() * 10),
-          blacklisted: Math.random() > 0.8, // 20%的用户被拉黑
-          registeredAt: Date.now() - Math.floor(Math.random() * 31536000000), // 随机注册时间
-          lastLoginAt: Date.now() - Math.floor(Math.random() * 604800000) // 随机最近登录时间
-        });
-      }
-      
-      setUsers(mockUsers);
+      // 清理 keyword，去除前后空格和制表符
+      const cleanKeyword = keyword.trim();
+      // 根据需求：仅获取 role 为 user 的用户，不按 status 过滤
+      const data = await adminApi.getUsers({ status: '', role: 'user', keyword: cleanKeyword, page, page_size: pageSize });
+      const list = Array.isArray(data?.results) ? data.results : (Array.isArray(data) ? data : []);
+      // 映射后端返回的字段到前端使用的字段
+      const normalized = list.map(u => ({
+        id: u.id,
+        name: u.name || u.username || u.phone || `用户${u.id}`,
+        phone: u.phone || '',
+        missedSignIns: u.no_show_count ?? 0,  // 后端返回 no_show_count
+        blacklisted: u.status === 'blacklisted',  // 根据 status 判断是否拉黑
+        role: u.role || 'user',
+        registeredAt: u.created_at || '',  // 后端返回 created_at，直接保留字符串格式
+        lastLoginAt: u.updated_at || ''   // 后端返回 updated_at，直接保留字符串格式
+      }));
+      // 兜底前端过滤，确保只展示 role=user
+      const filteredUsers = normalized.filter(u => u.role === 'user');
+      setUsers(filteredUsers);
+      // 使用过滤后的实际数量作为总数
+      setTotalCount(filteredUsers.length);
     } catch (err) {
       setError('获取用户数据失败');
       console.error('Error fetching users:', err);
@@ -42,13 +49,20 @@ const UserManagement = () => {
     fetchUsers();
   }, []);
 
+  // 当分页参数变化时自动刷新
+  useEffect(() => {
+    fetchUsers();
+  }, [page, pageSize]);
+
   // 切换用户拉黑状态
   const toggleBlacklist = async (id, currentStatus) => {
     try {
-      // 在真实场景中调用API
-      // await adminApi.toggleUserBlacklist(id, !currentStatus);
-      
-      // 模拟API调用
+      if (currentStatus) {
+        await adminApi.unblacklistUser(id);
+      } else {
+        await adminApi.blacklistUser(id);
+      }
+      // 成功后更新本地状态
       setUsers(prev => prev.map(u => u.id === id ? { ...u, blacklisted: !currentStatus } : u));
     } catch (err) {
       setError('操作失败');
@@ -92,6 +106,40 @@ const UserManagement = () => {
       <div className="flex flex-wrap items-center justify-between gap-4 mb-5">
         <h3 className="text-lg font-medium">用户管理</h3>
         <div className="flex items-center gap-2">
+          {/* 搜索与状态筛选 */}
+          <div className="flex items-center gap-2">
+            <input
+              type="text"
+              value={keyword}
+              onChange={(e) => setKeyword(e.target.value.trim())}
+              onKeyDown={(e) => { if (e.key === 'Enter') { setPage(1); fetchUsers(); } }}
+              onPaste={(e) => {
+                e.preventDefault();
+                const pastedText = e.clipboardData.getData('text').trim();
+                setKeyword(pastedText);
+              }}
+              placeholder="搜索用户名"
+              className="px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500"
+            />
+            
+            <select
+              value={pageSize}
+              onChange={(e) => { setPageSize(parseInt(e.target.value) || 10); setPage(1); }}
+              className="px-3 py-2 border rounded-lg text-sm"
+              title="每页数量"
+            >
+              <option value={10}>每页 10</option>
+              <option value={20}>每页 20</option>
+              <option value={50}>每页 50</option>
+            </select>
+            <button
+              onClick={() => { setPage(1); fetchUsers(); }}
+              className="px-3 py-2 bg-cyan-600 text-white rounded-lg text-sm hover:bg-cyan-700"
+            >
+              查询
+            </button>
+            <span className="text-sm text-slate-500 ml-2">共 {totalCount} 条</span>
+          </div>
           {/* 过滤选项 */}
           <div className="flex bg-slate-100 rounded-lg p-1">
             <button 
@@ -114,7 +162,7 @@ const UserManagement = () => {
             </button>
           </div>
           
-          {/* 自动拉黑按钮 */}
+          {/* 自动拉黑按钮（本地规则） */}
           <button 
             onClick={autoBlacklist} 
             className="px-4 py-2 bg-rose-600 text-white rounded-lg text-sm hover:bg-rose-700 transition-colors"
@@ -172,12 +220,12 @@ const UserManagement = () => {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm text-slate-500">
-                      {new Date(user.registeredAt).toLocaleDateString()}
+                      {user.registeredAt || '-'}
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm text-slate-500">
-                      {new Date(user.lastLoginAt).toLocaleDateString()}
+                      {user.lastLoginAt || '-'}
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
@@ -194,6 +242,37 @@ const UserManagement = () => {
           </tbody>
         </table>
       </div>
+      {/* 分页控件 */}
+      {Math.ceil(totalCount / pageSize) > 1 && (
+        <div className="mt-4 flex justify-center gap-2">
+          <button
+            onClick={() => setPage(p => Math.max(1, p - 1))}
+            disabled={page === 1 || loading}
+            className="px-3 py-1 border rounded hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+          >
+            上一页
+          </button>
+          {Array.from({ length: Math.ceil(totalCount / pageSize) }, (_, i) => i + 1).map(p => (
+            <button
+              key={p}
+              onClick={() => setPage(p)}
+              disabled={loading}
+              className={`px-3 py-1 rounded text-sm ${
+                p === page ? 'bg-cyan-600 text-white' : 'border hover:bg-slate-50'
+              }`}
+            >
+              {p}
+            </button>
+          ))}
+          <button
+            onClick={() => setPage(p => Math.min(Math.ceil(totalCount / pageSize), p + 1))}
+            disabled={page === Math.ceil(totalCount / pageSize) || loading}
+            className="px-3 py-1 border rounded hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+          >
+            下一页
+          </button>
+        </div>
+      )}
       
       {/* 统计信息 */}
       <div className="mt-5 p-3 bg-slate-50 rounded-lg">
