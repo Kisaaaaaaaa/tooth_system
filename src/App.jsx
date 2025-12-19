@@ -12,6 +12,10 @@ import AppointmentsPage from './components/pages/AppointmentsPage';
 import RecordsPage from './components/pages/RecordsPage';
 import AiInquiryPage from './components/pages/AiInquiryPage';
 import AdminDashboard from './components/admin/AdminDashboard';
+import AdminLayout from './components/admin/AdminLayout';
+import DoctorReview from './components/admin/DoctorReview';
+import HospitalManagement from './components/admin/HospitalManagement';
+import UserManagement from './components/admin/UserManagement';
 import ThreeDModelPage from './components/pages/ThreeDModelPage';
 import Login from './components/Auth/Login';
 import Register from './components/Auth/Register';
@@ -187,26 +191,13 @@ const AppWithRouter = () => {
                         <AiInquiryPage />
                     </div>
                 } />
-                <Route path="/admin" element={
-                    checkUserRole() === 'admin' ? (
-                        <div className="max-w-7xl mx-auto px-4 md:px-6">
-                            <AdminDashboard />
-                        </div>
-                    ) : (
-                        <div className="max-w-7xl mx-auto px-4 md:px-6 min-h-screen flex items-center justify-center">
-                            <div className="text-center">
-                                <h2 className="text-2xl font-semibold mb-4">无权访问</h2>
-                                <p className="text-slate-600 mb-6">仅管理员可访问此页面</p>
-                                <button
-                                    onClick={() => navigateTo('login')}
-                                    className="px-4 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 transition"
-                                >
-                                    返回登录
-                                </button>
-                            </div>
-                        </div>
-                    )
-                } />
+                {/* 管理员路由（使用侧边栏布局） */}
+                <Route path="/admin" element={<AdminLayout />}>
+                    <Route index element={<AdminDashboard />} />
+                    <Route path="doctors" element={<DoctorReview />} />
+                    <Route path="hospitals" element={<HospitalManagement />} />
+                    <Route path="users" element={<UserManagement />} />
+                </Route>
                 <Route path="/login" element={
                     <div className="max-w-7xl mx-auto px-4 md:px-6">
                         <Login navigateTo={navigateTo} />

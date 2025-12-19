@@ -19,6 +19,11 @@ const DoctorConsultation = () => {
         fetchConsultationSessions();
     }, []);
 
+    // 匿名化用户显示 - 保护隐私
+    const getAnonymousName = () => {
+        return '匿名患者';
+    };
+
     // 获取问诊会话列表
     const fetchConsultationSessions = async () => {
         try {
@@ -27,19 +32,18 @@ const DoctorConsultation = () => {
             const res = await consultationApi.getConsultationSessions();
             console.log('问诊会话列表:', res);
 
+            let sessionList = [];
             if (res && res.data) {
                 if (res.data.results && Array.isArray(res.data.results)) {
-                    setSessions(res.data.results);
+                    sessionList = res.data.results;
                 } else if (Array.isArray(res.data)) {
-                    setSessions(res.data);
-                } else {
-                    setSessions([]);
+                    sessionList = res.data;
                 }
             } else if (Array.isArray(res)) {
-                setSessions(res);
-            } else {
-                setSessions([]);
+                sessionList = res;
             }
+
+            setSessions(sessionList);
         } catch (err) {
             console.error('获取问诊列表失败:', err);
             setError('获取问诊列表失败');
@@ -223,7 +227,7 @@ const DoctorConsultation = () => {
                                 >
                                     <div className="flex items-start justify-between mb-2">
                                         <h3 className="font-bold text-slate-800 text-sm">
-                                            {session.patient_name || session.patient}
+                                            {getAnonymousName()}
                                         </h3>
                                         <span className="text-xs text-slate-400">
                                             {session.created_at ? new Date(session.created_at).toLocaleTimeString() : ''}
@@ -255,7 +259,7 @@ const DoctorConsultation = () => {
                             <div className="p-4 border-b border-slate-100 bg-gradient-to-r from-blue-50 to-cyan-50 flex items-center justify-between">
                                 <div>
                                     <h3 className="font-bold text-slate-800">
-                                        {selectedSession.patient_name || selectedSession.patient}
+                                        {getAnonymousName()}
                                     </h3>
                                     <p className="text-sm text-slate-500 flex items-center gap-1">
                                         <Clock size={14} />

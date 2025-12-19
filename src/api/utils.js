@@ -8,6 +8,11 @@ export function buildQuery(params = {}) {
 export function resolveMediaUrl(url) {
   if (!url) return url;
   try {
+    // 如果已经是完整的 http/https URL，直接返回，避免错误重写主机名
+    if (/^https?:\/\//i.test(url)) {
+      return url;
+    }
+
     let apiBase;
     try {
       apiBase = import.meta?.env?.VITE_API_BASE;
