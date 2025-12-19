@@ -1,7 +1,7 @@
 // 在线问诊 API 接口
 // 医生端和患者端都使用这些接口进行消息交互
 
-const API_BASE = 'http://10.78.120.72:8000/api';
+const API_BASE = 'http://localhost:8000/api';
 
 function getAuthHeader() {
     const token = localStorage.getItem('authToken') || localStorage.getItem('access_token');

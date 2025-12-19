@@ -1,7 +1,7 @@
 // API wrapper for auth endpoints based on provided fetch examples.
 // Each function returns parsed JSON when possible, or raw text otherwise.
 
-const API_BASE = 'http://10.78.120.72:8000/api'; // root with /api prefix; change if backend is mounted under a different prefix
+const API_BASE = 'http://localhost:8000/api'; // root with /api prefix; change if backend is mounted under a different prefix
 // 使用真实后端作为基础地址（以前指向本地 mock）
 const MOCK_BASE = API_BASE;
 
