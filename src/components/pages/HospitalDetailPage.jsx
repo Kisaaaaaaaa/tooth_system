@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Star, Clock } from 'lucide-react';
 import hospitalsApi from '../../api/hospitals';
 import doctorsApi from '../../api/doctors';
@@ -78,6 +78,8 @@ const HospitalDetailPage = ({ navigateTo, hospitalId, startConsultation, startAp
 
         fetchDoctors();
     }, [effectiveHospitalId]);
+
+    const navigate = useNavigate();
 
     // 选择的医生及详情加载状态（必须放在任何 return 之前，避免 hooks 顺序变化）
     const [selectedDoctor, setSelectedDoctor] = useState(null);
@@ -211,7 +213,7 @@ const HospitalDetailPage = ({ navigateTo, hospitalId, startConsultation, startAp
                 ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         {doctors.map(doctor => (
-                            <div key={doctor.id} className="bg-white rounded-lg shadow-lg overflow-hidden hover:shadow-xl transition-shadow duration-300 cursor-pointer" onClick={() => handleDoctorClick(doctor)}>
+                            <div key={doctor.id} className="bg-white rounded-lg shadow-lg overflow-hidden hover:shadow-xl transition-shadow duration-300 cursor-pointer" onClick={() => navigate(`/doctors/${doctor.id}`)}>
                                 <div className="p-5">
                                     <div className="flex items-center gap-4 mb-4">
                                         <img
@@ -236,7 +238,6 @@ const HospitalDetailPage = ({ navigateTo, hospitalId, startConsultation, startAp
                                                 ))}
                                             </div>
                                             <span className="font-bold text-slate-700">{doctor.score}</span>
-                                            <span className="text-sm text-slate-500">({doctor.reviews}条评价)</span>
                                         </div>
                                     </div>
                                     <div className="mb-5">
@@ -246,7 +247,7 @@ const HospitalDetailPage = ({ navigateTo, hospitalId, startConsultation, startAp
                                     <div className="flex gap-2">
                                         <button
                                             className="flex-1 py-2.5 bg-gradient-to-r from-cyan-500 to-cyan-600 text-white rounded-lg text-sm font-medium hover:from-cyan-600 hover:to-cyan-700 transition-all shadow-md hover:shadow-lg"
-                                            onClick={() => startAppointment ? startAppointment(doctor) : navigateTo('appointment')}
+                                            onClick={(e) => { e.stopPropagation(); navigate(`/doctors/${doctor.id}`); }}
                                         >
                                             预约挂号
                                         </button>

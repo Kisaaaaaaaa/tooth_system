@@ -70,20 +70,17 @@ const HospitalsPage = ({ navigateTo }) => {
         fetchHospitals();
     }, [filter, latitude, longitude]);
 
-    // 筛选医院
+    // 搜索框关键字
+    const [searchKeyword, setSearchKeyword] = useState('');
+
+    // 筛选医院（加名称搜索）
     const filteredHospitals = hospitals.filter(h => {
-        if (filter === 'near') {
-            // 距离最近筛选：后端返回的数据中没有distance字段，但有latitude和longitude
-            // 只要数据存在就显示，后端会处理距离排序
-            return true;
+        // 名称搜索优先
+        if (searchKeyword.trim() && h.name) {
+            if (!h.name.toLowerCase().includes(searchKeyword.trim().toLowerCase())) return false;
         }
-
-        if (filter === 'frequent') {
-            // 常去的筛选：使用visit_count字段
-            // 对于mock数据，即使没有visit_count字段也显示，后端会正确排序
-            return true;
-        }
-
+        if (filter === 'near') return true;
+        if (filter === 'frequent') return true;
         return true;
     });
 
@@ -91,9 +88,9 @@ const HospitalsPage = ({ navigateTo }) => {
 
     return (
         <div className="space-y-4 animate-fade-in">
-            {/* 筛选条件区域 - 响应式布局 */}
-            <div className="space-y-3 pt-4">
-                {/* 筛选条件 */}
+            {/* 顶部区域：筛选+搜索框 */}
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between space-y-3 pt-4">
+                {/* 左侧筛选条件 */}
                 <div className="flex gap-2 justify-start">
                     {['all', 'near', 'frequent'].map(f => (
                         <button
@@ -109,13 +106,17 @@ const HospitalsPage = ({ navigateTo }) => {
                     ))}
                 </div>
 
-                {/* 地理位置错误提示 */}
-                {(error || geolocationError) && (
-                    <div className="bg-red-50 text-red-600 p-3 rounded-lg text-sm">
-                        {error}
-                        {geolocationError && <>{error ? ' ' : ''}{geolocationError}</>}
-                    </div>
-                )}
+                {/* 右上角搜索框 */}
+                <div className="flex justify-end md:justify-end">
+                    <input
+                        type="text"
+                        placeholder="搜索医院名称"
+                        value={searchKeyword}
+                        onChange={e => setSearchKeyword(e.target.value)}
+                        className="w-56 pl-10 pr-4 py-2 rounded-xl text-sm border-2 border-cyan-100 focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:border-transparent transition-all duration-300 bg-white shadow-sm"
+                        style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg width=\'18\' height=\'18\' viewBox=\'0 0 18 18\' fill=\'none\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Ccircle cx=\'8.5\' cy=\'8.5\' r=\'7.5\' stroke=\'%239CA3AF\' stroke-width=\'2\'/%3E%3Cpath d=\'M16 16L13 13\' stroke=\'%239CA3AF\' stroke-width=\'2\' stroke-linecap=\'round\'/%3E%3C/svg%3E")', backgroundRepeat: 'no-repeat', backgroundPosition: '10px center' }}
+                    />
+                </div>
             </div>
 
             {/* 医院列表 - 一排三个 */}
