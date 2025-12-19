@@ -1,16 +1,22 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Star, MessageSquare, Calendar, Search } from 'lucide-react';
 import doctorsApi from '../../api/doctors';
-import { MOCK_DOCTORS, MOCK_HOSPITALS } from '../../data/mockData';
+import hospitalsApi from '../../api/hospitals';
+import { MOCK_DOCTORS } from '../../data/mockData';
 
 // 医生概况页面
 const DoctorsPage = ({ navigateTo, startConsultation, startAppointment }) => {
+    const navigate = useNavigate();
     // 搜索关键词
     const [searchKeyword, setSearchKeyword] = useState('');
     // 医生数据、加载、错误
     const [doctors, setDoctors] = useState([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
+
+    // 医院映射（id -> name），用于展示接口返回的 hospital_id
+    const [hospitalsMap, setHospitalsMap] = useState({});
 
     // 加载医生列表（优先接口，失败回退 mock）
     useEffect(() => {
@@ -34,6 +40,27 @@ const DoctorsPage = ({ navigateTo, startConsultation, startAppointment }) => {
         fetchDoctors();
     }, []);
 
+    // 加载医院列表（用于 id -> name 映射，避免展示假数据）
+    useEffect(() => {
+        const fetchHospitalsMap = async () => {
+            try {
+                const resp = await hospitalsApi.getHospitals({ page: 1, page_size: 1000 });
+                const hospitals = resp?.data?.results || resp?.results || [];
+                const map = {};
+                hospitals.forEach(h => {
+                    const id = h?.id ?? h?.pk;
+                    if (id != null) map[id] = h?.name || h?.hospital_name || '';
+                });
+                setHospitalsMap(map);
+            } catch (err) {
+                // 不影响页面主流程：拿不到医院表就回退为“医院ID:xx/未知医院”展示
+                console.warn('加载医院列表失败，将使用兜底展示', err);
+                setHospitalsMap({});
+            }
+        };
+        fetchHospitalsMap();
+    }, []);
+
     // 根据搜索关键词过滤医生列表
     const filteredDoctors = doctors.filter(doctor =>
         doctor.name?.toLowerCase().includes(searchKeyword.toLowerCase())
@@ -41,8 +68,8 @@ const DoctorsPage = ({ navigateTo, startConsultation, startAppointment }) => {
 
     // 根据医院ID获取医院名称（接口未返回名称时兜底）
     const getHospitalName = (hospitalId) => {
-        const hospital = MOCK_HOSPITALS.find(h => h.id === hospitalId);
-        return hospital ? hospital.name : '未知医院';
+        if (hospitalId == null || hospitalId === '') return '未知医院';
+        return hospitalsMap[hospitalId] || `医院ID:${hospitalId}`;
     };
 
     return (
@@ -79,7 +106,8 @@ const DoctorsPage = ({ navigateTo, startConsultation, startAppointment }) => {
                     {filteredDoctors.map((doc) => (
                         <div
                             key={doc.id}
-                            className="bg-white rounded-2xl p-5 shadow-lg border border-slate-100 hover:shadow-xl hover:-translate-y-1 transition-all duration-300"
+                            className="bg-white rounded-2xl p-5 shadow-lg border border-slate-100 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 cursor-pointer"
+                            onClick={() => navigate(`/doctors/${doc.id}`)}
                         >
                             <div className="flex items-center gap-4">
                                 {/* 头像 */}
@@ -109,14 +137,14 @@ const DoctorsPage = ({ navigateTo, startConsultation, startAppointment }) => {
                                     {/* 操作按钮 */}
                                     <div className="flex gap-2 mt-5">
                                         <button
-                                            onClick={() => startConsultation && startConsultation(doc)}
+                                            onClick={(e) => { e.stopPropagation(); startConsultation && startConsultation(doc); }}
                                             className="flex-1 py-2 bg-gradient-to-r from-blue-50 to-blue-100 text-blue-700 text-sm font-medium rounded-lg hover:from-blue-100 hover:to-blue-200 transition-all duration-300 flex items-center justify-center gap-1.5 shadow-sm hover:shadow-md"
                                         >
                                             <MessageSquare size={16} />
                                             <span>在线问诊</span>
                                         </button>
                                         <button
-                                            onClick={() => startAppointment ? startAppointment(doc) : navigateTo('appointment')}
+                                            onClick={(e) => { e.stopPropagation(); navigate(`/doctors/${doc.id}`); }}
                                             className="flex-1 py-2 bg-gradient-to-r from-cyan-500 to-cyan-600 text-white text-sm font-medium rounded-lg hover:from-cyan-600 hover:to-cyan-700 transition-all duration-300 flex items-center justify-center gap-1.5 shadow-md hover:shadow-lg"
                                         >
                                             <Calendar size={16} />

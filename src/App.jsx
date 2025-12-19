@@ -6,6 +6,7 @@ import HomePage from './components/pages/HomePage';
 import HospitalsPage from './components/pages/HospitalsPage';
 import HospitalDetailPage from './components/pages/HospitalDetailPage';
 import DoctorsPage from './components/pages/DoctorsPage';
+import DoctorDetailPage from './components/pages/DoctorDetailPage';
 import ConsultationPage from './components/pages/ConsultationPage';
 import AppointmentsPage from './components/pages/AppointmentsPage';
 import RecordsPage from './components/pages/RecordsPage';
@@ -156,6 +157,11 @@ const AppWithRouter = () => {
                 <Route path="/doctors" element={
                     <div className="max-w-7xl mx-auto px-4 md:px-6">
                         <DoctorsPage navigateTo={navigateTo} startConsultation={startConsultation} startAppointment={startAppointment} />
+                    </div>
+                } />
+                <Route path="/doctors/:doctorId" element={
+                    <div className="max-w-7xl mx-auto px-4 md:px-6">
+                        <DoctorDetailPage navigateTo={navigateTo} startAppointment={(doctor) => { setSelectedDoctor(doctor); navigateTo('appointment'); }} />
                     </div>
                 } />
                 <Route path="/consultation" element={
