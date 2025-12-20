@@ -4,6 +4,7 @@ import { Calendar, Clock, Navigation } from 'lucide-react';
 import appointmentsApi from '../../api/appointments';
 import hospitalsApi from '../../api/hospitals';
 import doctorsApi from '../../api/doctors';
+import { getAMapLocation } from '../../api/amapLocation';
 
 // 预约管理页面
 const AppointmentsPage = () => {
@@ -101,19 +102,8 @@ const AppointmentsPage = () => {
     const [checkinError, setCheckinError] = useState('');
     const [checkinErrorModal, setCheckinErrorModal] = useState(false);
 
-    // 获取地理位置（可选）
-    const getLocation = () => {
-        return new Promise((resolve, reject) => {
-            if (!navigator.geolocation) return resolve({});
-            navigator.geolocation.getCurrentPosition(
-                pos => resolve({
-                    latitude: pos.coords.latitude,
-                    longitude: pos.coords.longitude
-                }),
-                err => resolve({})
-            );
-        });
-    };
+    // 获取地理位置：统一使用高德定位
+    const getLocation = () => getAMapLocation();
 
     const handleCheckIn = async (id) => {
         setCheckinLoadingId(id);
