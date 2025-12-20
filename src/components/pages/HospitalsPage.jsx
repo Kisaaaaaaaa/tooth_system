@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { MapPin, ChevronRight, Phone, Navigation } from 'lucide-react';
 import hospitalsApi from '../../api/hospitals';
 import { MOCK_HOSPITALS } from '../../data/mockData';
+import RoutePlannerModal from '../navigation/RoutePlannerModal';
+import { getAMapLocation } from '../../api/amapLocation';
 
 // 医院概况页面
 const HospitalsPage = ({ navigateTo }) => {
@@ -12,31 +14,73 @@ const HospitalsPage = ({ navigateTo }) => {
     const [latitude, setLatitude] = useState(null);
     const [longitude, setLongitude] = useState(null);
     const [geolocationError, setGeolocationError] = useState(null);
+    const [locationAccuracy, setLocationAccuracy] = useState(null);
 
-    // 获取用户地理位置
-    const fetchGeolocation = () => {
-        if (!navigator.geolocation) {
-            setGeolocationError('您的浏览器不支持地理位置服务');
-            return;
-        }
+    // 路线规划弹窗状态
+    const [routeModalOpen, setRouteModalOpen] = useState(false);
+    const [routeHospital, setRouteHospital] = useState(null);
+    const [routeLoading, setRouteLoading] = useState(false);
+    const [routeError, setRouteError] = useState(null);
+    const [routeResult, setRouteResult] = useState(null);
 
-        navigator.geolocation.getCurrentPosition(
-            (position) => {
-                setLatitude(position.coords.latitude);
-                setLongitude(position.coords.longitude);
+    const fetchGeolocationOnce = () => {
+        return getAMapLocation()
+            .then((loc) => {
+                setLatitude(loc.latitude);
+                setLongitude(loc.longitude);
+                setLocationAccuracy(loc.accuracy ?? null);
                 setGeolocationError(null);
-            },
-            (error) => {
-                console.error('获取地理位置失败:', error);
-                setGeolocationError('无法获取您的位置，请检查是否允许访问位置信息');
+                return { latitude: loc.latitude, longitude: loc.longitude };
+            })
+            .catch((err) => {
+                console.error('获取地理位置失败:', err);
+                const msg = err?.message || '无法获取您的位置，请检查是否允许定位权限';
+                setGeolocationError(msg);
+                return Promise.reject(new Error(msg));
+            });
+    };
+
+    const openRoutePlanner = async (hospital) => {
+        setRouteHospital(hospital);
+        setRouteModalOpen(true);
+        setRouteLoading(true);
+        setRouteError(null);
+        setRouteResult(null);
+
+        try {
+            const token = localStorage.getItem('access_token') || localStorage.getItem('authToken');
+            if (!token) {
+                throw new Error('未检测到登录信息，请先登录后再进行路线规划');
             }
-        );
+
+            // 优先复用已获取的定位；没有则临时获取一次
+            let loc = null;
+            if (latitude != null && longitude != null) {
+                loc = { latitude, longitude };
+            } else {
+                try {
+                    loc = await fetchGeolocationOnce();
+                } catch {
+                    // 定位失败也继续：body 可为空，后端可按默认处理；前端仍可打开高德导航兜底
+                    loc = null;
+                }
+            }
+
+            const res = await hospitalsApi.postHospitalRoute(hospital.id, loc || {});
+            // 约定：后端通用返回结构 { code, message, data }
+            setRouteResult(res?.data ?? res);
+        } catch (e) {
+            console.error('路线规划请求失败:', e);
+            setRouteError(e?.message || '路线规划请求失败');
+        } finally {
+            setRouteLoading(false);
+        }
     };
 
     // 当选择"距离最近"筛选时，获取用户地理位置
     useEffect(() => {
         if (filter === 'near') {
-            fetchGeolocation();
+            fetchGeolocationOnce();
         }
     }, [filter]);
 
@@ -88,6 +132,18 @@ const HospitalsPage = ({ navigateTo }) => {
 
     return (
         <div className="space-y-4 animate-fade-in">
+            {/* 路线规划弹窗 */}
+            <RoutePlannerModal
+                open={routeModalOpen}
+                onClose={() => setRouteModalOpen(false)}
+                hospital={routeHospital}
+                userLocation={latitude != null && longitude != null ? { latitude, longitude, accuracy: locationAccuracy } : null}
+                routeResult={routeResult}
+                loading={routeLoading}
+                error={routeError}
+                onRetry={() => routeHospital && openRoutePlanner(routeHospital)}
+            />
+
             {/* 顶部区域：筛选+搜索框 */}
             <div className="flex flex-col md:flex-row md:items-center md:justify-between space-y-3 pt-4">
                 {/* 左侧筛选条件 */}
@@ -119,6 +175,12 @@ const HospitalsPage = ({ navigateTo }) => {
                 </div>
             </div>
 
+            {geolocationError && (
+                <div className="text-sm text-amber-700 bg-amber-50 border border-amber-100 rounded-xl px-4 py-3">
+                    {geolocationError}
+                </div>
+            )}
+
             {/* 医院列表 - 一排三个 */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {filteredHospitals.map(hospital => (
@@ -146,6 +208,7 @@ const HospitalsPage = ({ navigateTo }) => {
                                 <button
                                     className="text-cyan-500 hover:text-cyan-600 transition-colors"
                                     title="查看地图位置"
+                                    onClick={() => openRoutePlanner(hospital)}
                                 >
                                     <Navigation size={16} />
                                 </button>

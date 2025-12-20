@@ -1,8 +1,19 @@
 // API wrapper for hospitals endpoints
 // Each function returns parsed JSON when possible, or raw text otherwise.
 
-// 使用后端 API 地址
-const API_BASE = 'http://localhost:8000/api';
+// 使用后端 API 地址（允许通过 Vite 环境变量覆盖）
+const API_BASE = (() => {
+    try {
+        return import.meta?.env?.VITE_API_BASE || 'http://localhost:8000/api';
+    } catch {
+        return 'http://localhost:8000/api';
+    }
+})();
+
+function authHeader() {
+    const token = localStorage.getItem('access_token') || localStorage.getItem('authToken');
+    return token ? { 'Authorization': `Bearer ${token}` } : {};
+}
 
 function handleResponse(res) {
     const ct = res.headers.get('content-type') || '';
@@ -45,11 +56,14 @@ export async function getHospitals(params = {}) {
     queryParams.append('page', page);
     queryParams.append('page_size', page_size);
 
-    if (latitude) queryParams.append('latitude', latitude);
-    if (longitude) queryParams.append('longitude', longitude);
+    if (latitude != null) queryParams.append('latitude', latitude);
+    if (longitude != null) queryParams.append('longitude', longitude);
 
     const requestOptions = {
         method: 'GET',
+        headers: {
+            'Accept': 'application/json',
+        },
         redirect: 'follow'
     };
 
@@ -63,16 +77,51 @@ export async function getHospitals(params = {}) {
  * @returns {Promise<Object>} 返回医院详情数据
  */
 export async function getHospitalDetail(hospital_id) {
+    const headers = {
+        'Accept': 'application/json',
+        ...authHeader(),
+    };
+
     const requestOptions = {
         method: 'GET',
+        headers,
         redirect: 'follow'
     };
 
-    const res = await fetch(`${API_BASE}/hospitals/${hospital_id}`, requestOptions);
+    // Django REST Framework 常见结尾带 /，避免 301 跳转丢 header 或直接 404
+    const res = await fetch(`${API_BASE}/hospitals/${hospital_id}/`, requestOptions);
+    return handleResponse(res);
+}
+
+/**
+ * 路线规划：向后端提交当前位置，请求返回路线/导航所需信息
+ * POST /hospitals/{id}/route/
+ * @param {number|string} hospital_id - 医院ID（Path 参数）
+ * @param {{latitude?: number, longitude?: number}} body - 当前位置（可选：不传则后端可自行兜底或按默认处理）
+ */
+export async function postHospitalRoute(hospital_id, body = {}) {
+    const headers = {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        ...authHeader()
+    };
+
+    const requestOptions = {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+            latitude: body.latitude,
+            longitude: body.longitude
+        }),
+        redirect: 'follow'
+    };
+
+    const res = await fetch(`${API_BASE}/hospitals/${hospital_id}/route/`, requestOptions);
     return handleResponse(res);
 }
 
 export default {
     getHospitals,
-    getHospitalDetail
+    getHospitalDetail,
+    postHospitalRoute
 };

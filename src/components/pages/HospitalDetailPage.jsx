@@ -16,6 +16,11 @@ const HospitalDetailPage = ({ navigateTo, hospitalId, startConsultation, startAp
     const [error, setError] = useState(null);
     const [doctorsError, setDoctorsError] = useState(null);
 
+    // 兼容后端字段差异（避免 name/image 为空导致标题/图片不显示）
+    const hospitalName = hospital?.name || '医院详情';
+    const hospitalImage = hospital?.image || null;
+    const hospitalDesc = hospital?.description || hospital?.introduction || '';
+
     // 获取医院详情
     useEffect(() => {
         const fetchHospitalDetail = async () => {
@@ -179,18 +184,23 @@ const HospitalDetailPage = ({ navigateTo, hospitalId, startConsultation, startAp
             <div className="bg-white rounded-lg shadow-lg overflow-hidden p-6">
                 <div className="flex flex-col md:flex-row gap-6">
                     <img
-                        src={hospital.image}
-                        alt={hospital.name}
+                        src={hospitalImage || '/images/default-hospital.jpg'}
+                        alt={hospitalName}
                         className="w-full md:w-1/3 h-64 object-cover rounded-lg shadow-md"
+                        onError={(e) => {
+                            // 避免图片地址为空/404 导致整块空白
+                            e.currentTarget.onerror = null;
+                            e.currentTarget.src = '/images/default-hospital.jpg';
+                        }}
                     />
                     <div className="flex-1">
-                        <h1 className="text-2xl font-bold mb-4 text-cyan-700">{hospital.name}</h1>
+                        <h1 className="text-2xl font-bold mb-4 text-cyan-700">{hospitalName}</h1>
                         <div className="space-y-3 mb-6">
                             <p className="flex items-center gap-2"><span className="text-slate-600">医院电话:</span> <span className="font-medium">{hospital.phone}</span></p>
                             <p className="flex items-center gap-2"><span className="text-slate-600">地址:</span> <span className="font-medium">{hospital.address}</span></p>
                         </div>
                         <div className="bg-slate-50 p-4 rounded-lg text-slate-600 leading-relaxed">
-                            {hospital.description || '暂无医院介绍'}
+                            {hospitalDesc || '暂无医院介绍'}
                         </div>
                     </div>
                 </div>
