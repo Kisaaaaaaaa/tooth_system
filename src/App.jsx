@@ -37,6 +37,7 @@ const AppWithRouter = () => {
     const [selectedDoctor, setSelectedDoctor] = useState(null);
     const [showLoginModal, setShowLoginModal] = useState(false);
     const [loginTip, setLoginTip] = useState('');
+    const [pendingRedirect, setPendingRedirect] = useState('');
     const REQUIRE_CONSULTATION_AUTH = true; // 预留开关，后续可开启问诊登录校验
 
     // 获取当前页面名称
@@ -68,6 +69,24 @@ const AppWithRouter = () => {
     // Router Logic
     const navigateTo = (page, params = {}) => {
         window.scrollTo({ top: 0, behavior: 'smooth' });
+
+        // 导航栏访问受限页面：未登录时提示并跳转登录
+        const authed = isAuthed();
+        const restrictedPages = new Set(['appointment', 'records', 'aiInquiry']);
+        if (REQUIRE_CONSULTATION_AUTH) restrictedPages.add('consultation');
+
+        if (page && restrictedPages.has(page) && !authed) {
+            const tips = {
+                appointment: '登录后才能查看预约记录',
+                records: '登录后才能查看病例',
+                aiInquiry: '登录后才能使用 AI 问询',
+                consultation: '登录后才能进行在线咨询',
+            };
+            setLoginTip(tips[page] || '登录后才能访问该功能');
+            setPendingRedirect(`/${page}`);
+            setShowLoginModal(true);
+            return;
+        }
 
         // 跳医院详情时直接带上参数到路由，避免刷新丢状态
         if (page === 'hospitalDetail' && params.hospitalId) {
@@ -252,7 +271,9 @@ const AppWithRouter = () => {
                             <button
                                 onClick={() => {
                                     setShowLoginModal(false);
-                                    navigateTo('login');
+                                    const redirect = pendingRedirect || location.pathname || '/';
+                                    setPendingRedirect('');
+                                    navigate(`/login?redirect=${encodeURIComponent(redirect)}`);
                                 }}
                                 className="flex-1 py-2.5 rounded-lg bg-cyan-500 text-white hover:bg-cyan-600 transition shadow-sm"
                             >

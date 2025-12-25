@@ -20,15 +20,15 @@ function handleResp(resp) {
             return resp.json().then(j => {
                 // 尝试解析错误信息，提取用户友好的提示
                 let errorMessage = '';
-                
+
                 if (j.message) {
                     try {
                         const messageStr = j.message;
                         const errors = [];
-                        
+
                         // 直接使用正则表达式提取所有中文错误信息
                         const errorMatches = messageStr.match(/'([^']*[\u4e00-\u9fa5]+[^']*)'/g);
-                        
+
                         if (errorMatches) {
                             // 移除引号并将所有错误信息合并
                             errorMatches.forEach(match => {
@@ -44,12 +44,12 @@ function handleResp(resp) {
                         errorMessage = j.message;
                     }
                 }
-                
+
                 // 如果没有提取到错误信息，使用默认的错误提示
                 if (!errorMessage) {
                     errorMessage = `${resp.status} ${resp.statusText}`;
                 }
-                
+
                 const error = new Error(errorMessage);
                 error.status = resp.status;
                 error.body = j;
@@ -93,5 +93,32 @@ export async function inquiryWithFiles({ question, context = {}, files } = {}) {
     return handleResp(resp);
 }
 
-const ai = { inquiry, inquiryWithFiles };
+/**
+ * AI 问询（新版 /ai/chat/ 接口）
+ * @param {{message: string, age?: number, gender?: 'male'|'female', has_allergy?: boolean}} payload
+ * @returns {Promise<{code:number, message:string, data:{answer:string, recommended_doctors:Array, suggestion_level?:string}}|any>}
+ */
+export async function chat(payload = {}) {
+    const headers = getAuthHeaders();
+    headers.append('Content-Type', 'application/json');
+    headers.append('Accept', 'application/json');
+
+    const body = JSON.stringify({
+        message: payload.message,
+        ...(payload.age !== undefined && payload.age !== null && payload.age !== '' ? { age: Number(payload.age) } : {}),
+        ...(payload.gender ? { gender: payload.gender } : {}),
+        ...(payload.has_allergy !== undefined && payload.has_allergy !== null ? { has_allergy: !!payload.has_allergy } : {}),
+    });
+
+    // 约定：后端挂在 /api 前缀下，且路径以 /ai/chat/ 结尾
+    const resp = await fetch(API_ROOT + '/ai/chat/', {
+        method: 'POST',
+        headers,
+        body,
+        redirect: 'follow'
+    });
+    return handleResp(resp);
+}
+
+const ai = { inquiry, inquiryWithFiles, chat };
 export default ai;

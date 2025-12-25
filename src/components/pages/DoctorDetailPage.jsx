@@ -14,6 +14,10 @@ const DoctorDetailPage = ({ navigateTo }) => {
     const { doctorId } = useParams();
     const navigate = useNavigate();
 
+    // 未登录提示弹窗（仅本页面使用，不改全局逻辑）
+    const [showLoginModal, setShowLoginModal] = useState(false);
+    const [loginTip, setLoginTip] = useState('');
+
     const [doctor, setDoctor] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -183,7 +187,9 @@ const DoctorDetailPage = ({ navigateTo }) => {
         // require user to be logged in (token present)
         const token = localStorage.getItem('access_token') || localStorage.getItem('authToken');
         if (!token) {
-            setSubmitError('请先登录后再创建预约');
+            // 医生详情页点击预约：未登录时弹窗提示并引导去登录
+            setLoginTip('登录后才能预约挂号');
+            setShowLoginModal(true);
             return;
         }
         setSubmitting(true);
@@ -667,6 +673,35 @@ const DoctorDetailPage = ({ navigateTo }) => {
                                 className="px-6 py-2.5 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 transition-colors w-full"
                             >
                                 确认
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* 未登录提示弹窗（仅医生详情页） */}
+            {showLoginModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+                    <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6">
+                        <h3 className="text-lg font-bold text-slate-800 mb-3">需要登录</h3>
+                        <p className="text-slate-600 mb-6">{loginTip || '您还未登录，暂时无法使用该功能。'}</p>
+                        <div className="flex gap-3">
+                            <button
+                                onClick={() => setShowLoginModal(false)}
+                                className="flex-1 py-2.5 rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50 transition"
+                            >
+                                取消
+                            </button>
+                            <button
+                                onClick={() => {
+                                    setShowLoginModal(false);
+                                    // 回跳地址：当前医生详情页
+                                    const redirect = `/doctors/${doctorId}`;
+                                    navigate(`/login?redirect=${encodeURIComponent(redirect)}`);
+                                }}
+                                className="flex-1 py-2.5 rounded-lg bg-cyan-500 text-white hover:bg-cyan-600 transition shadow-sm"
+                            >
+                                去登录
                             </button>
                         </div>
                     </div>

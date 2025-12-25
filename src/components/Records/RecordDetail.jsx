@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import recordsApi from '../../api/records';
-import { Star, ExternalLink, ChevronLeft } from 'lucide-react'; // 引入返回箭头图标
+import { Star, ExternalLink, ChevronLeft, Download } from 'lucide-react'; // 引入返回箭头图标
 
 const StarsInput = ({ value = 0, onChange }) => {
     const [v, setV] = useState(value);
@@ -47,6 +47,81 @@ const RecordDetail = ({ id, onClose, onRated }) => {
     const [comment, setComment] = useState('');
     const [submitting, setSubmitting] = useState(false);
     const [imageError, setImageError] = useState(false);
+
+    const formatDateForFilename = (raw) => {
+        if (!raw) return '';
+        try {
+            const d = new Date(raw);
+            if (!Number.isNaN(d.getTime())) {
+                const y = d.getFullYear();
+                const m = String(d.getMonth() + 1).padStart(2, '0');
+                const day = String(d.getDate()).padStart(2, '0');
+                return `${y}${m}${day}`;
+            }
+        } catch {
+            // ignore
+        }
+        // 兜底：提取类似 2025-12-25 的日期
+        const m = String(raw).match(/(\d{4})-(\d{2})-(\d{2})/);
+        if (m) return `${m[1]}${m[2]}${m[3]}`;
+        return '';
+    };
+
+    const handleDownloadRecord = () => {
+        if (!record) return;
+
+        const lines = [];
+        lines.push('牙科就诊病例');
+        lines.push('================');
+        lines.push(`病例ID：${record.id ?? id ?? ''}`);
+        lines.push(`主治医生：${record.doctor_name || record.doctor || '-'}`);
+        lines.push(`就诊时间：${record.date || record.created_at || '未知时间'}`);
+        lines.push('');
+        lines.push(`诊断：${record.diagnosis || '-'}`);
+        lines.push('');
+        lines.push('处置/记录：');
+        lines.push(String(record.content || record.summary || '-'));
+
+        if (record.treatment) {
+            lines.push('');
+            lines.push(`治疗方案：${record.treatment}`);
+        }
+
+        if (Array.isArray(record.medications) && record.medications.length > 0) {
+            lines.push('');
+            lines.push(`药物：${record.medications.join('、')}`);
+        }
+
+        if (record.result_image) {
+            lines.push('');
+            lines.push(`结果图片链接：${record.result_image}`);
+        }
+
+        if (record.rated) {
+            lines.push('');
+            lines.push('评价：');
+            lines.push(`评分：${record.rating ?? ''}`);
+            lines.push(`评价内容：${record.comment || '无'}`);
+        }
+
+        const content = lines.join('\n');
+        const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+
+        const dateKey = formatDateForFilename(record.date || record.created_at);
+        const safeId = record.id ?? id ?? 'record';
+        const filename = `病例_${safeId}${dateKey ? `_${dateKey}` : ''}.txt`;
+
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+
+        // 释放 blob url
+        setTimeout(() => URL.revokeObjectURL(url), 0);
+    };
 
     useEffect(() => {
         if (!id) return;
@@ -107,7 +182,18 @@ const RecordDetail = ({ id, onClose, onRated }) => {
                     {/* 标题：移除多余文字，仅保留就诊详情 */}
                     <h3 className="text-xl font-semibold text-sky-800">就诊详情</h3>
                 </div>
-                {/* 右上角无任何文字，保持空白整洁 */}
+                {/* 右上角：下载病例 */}
+                <button
+                    type="button"
+                    onClick={handleDownloadRecord}
+                    disabled={!record || loading}
+                    className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-white border border-sky-200 text-sky-700 hover:bg-sky-100 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                    aria-label="下载病例"
+                    title={!record ? '病例未加载完成' : '下载病例'}
+                >
+                    <Download size={16} />
+                    下载病例
+                </button>
             </div>
 
             {/* 加载/错误提示：浅蓝色加载样式，保留红色错误警示 */}
