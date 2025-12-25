@@ -16,6 +16,20 @@ const HomePage = ({ navigateTo }) => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
+    const toPercent = (value) => {
+        const n = Number(value);
+        if (!Number.isFinite(n)) return 0;
+
+        // 兼容两种来源：
+        // - 0~5：按 5 分制换算为 0~100
+        // - 0~100：按百分制直接展示
+        if (n >= 0 && n <= 5) return Math.round((n / 5) * 100);
+        if (n >= 0 && n <= 100) return Math.round(n);
+
+        // 兜底：防止异常值撑爆 UI
+        return Math.round(Math.max(0, Math.min(100, n)));
+    };
+
     // 获取统计数据
     useEffect(() => {
         const fetchStatistics = async () => {
@@ -118,9 +132,9 @@ const HomePage = ({ navigateTo }) => {
                                 <div className="p-4 rounded-xl bg-pink-50 mb-4">
                                     <Heart className="text-pink-500" size={28} />
                                 </div>
-                                <div className="text-4xl font-bold text-slate-800 mb-2">{statistics.patient_satisfaction}%</div>
+                                <div className="text-4xl font-bold text-slate-800 mb-2">{toPercent(statistics.patient_satisfaction)}%</div>
                                 <div className="font-medium text-slate-700 text-lg">患者满意度</div>
-                                <div className="text-sm text-slate-500 mt-2">患者满意度提升至{statistics.patient_satisfaction}%以上</div>
+                                <div className="text-sm text-slate-500 mt-2">患者满意度提升至{toPercent(statistics.patient_satisfaction)}%以上</div>
                             </div>
 
                             <div className="bg-white rounded-xl p-6 shadow-sm border-t-4 border-cyan-500 hover:shadow-md transition-shadow flex flex-col items-center text-center">
@@ -154,7 +168,9 @@ function HeroCarousel({ navigateTo }) {
     const backgroundImages = [
         '/images/儿童牙医.png',
         '/images/讲解.png',
-        '/images/牙医.png'
+        '/images/牙医.png',
+        '/images/环境.png',
+        '/images/治疗环境.jpg'
     ];
 
     const [currentSlide, setCurrentSlide] = useState(0);

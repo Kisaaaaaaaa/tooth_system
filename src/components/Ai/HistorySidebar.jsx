@@ -1,6 +1,12 @@
 import React from 'react';
 
-const HistorySidebar = ({ history = [], onSelect, onDelete, onClear }) => {
+const HistorySidebar = ({
+    history = [],
+    onSelect,
+    // 顶部动作
+    onNewChat,
+    onOpenSearch,
+}) => {
     return (
         <div className="hidden md:block fixed left-0 top-0 bottom-0 w-72 bg-white border-r border-slate-200 overflow-auto">
             <div className="pt-4 pb-2 px-3">
@@ -10,6 +16,27 @@ const HistorySidebar = ({ history = [], onSelect, onDelete, onClear }) => {
                 </div>
             </div>
             <div className="px-3">
+                {/* 顶部动作 */}
+                <div className="px-2 pb-2 space-y-2">
+                    <button
+                        type="button"
+                        onClick={() => onNewChat && onNewChat()}
+                        className="w-full text-left flex items-center gap-2 px-3 py-2 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700"
+                    >
+                        <span className="text-lg">✏️</span>
+                        <span className="text-sm font-medium">新聊天</span>
+                    </button>
+
+                    <button
+                        type="button"
+                        onClick={() => onOpenSearch && onOpenSearch()}
+                        className="w-full text-left flex items-center gap-2 px-3 py-2 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700"
+                    >
+                        <span className="text-lg">🔎</span>
+                        <span className="text-sm font-medium">搜索聊天</span>
+                    </button>
+                </div>
+
                 <div className="py-2 px-2 text-sm font-medium text-slate-700">历史会话</div>
                 <div className="space-y-2 overflow-auto max-h-[60vh] px-2">
                     {history.length === 0 && (
@@ -17,9 +44,9 @@ const HistorySidebar = ({ history = [], onSelect, onDelete, onClear }) => {
                     )}
 
                     {history.map(item => {
-                        const preview = item.preview || 
-                            (item.messages && item.messages.find(m => m.role === 'user') 
-                                ? item.messages.find(m => m.role === 'user').text 
+                        const preview = item.preview ||
+                            (item.messages && item.messages.find(m => m.role === 'user')
+                                ? item.messages.find(m => m.role === 'user').text
                                 : (item.question || (item.files ? `上传 ${item.files} 个文件` : '(无内容)')));
                         return (
                             <div key={item.id} className="bg-white rounded-md p-2 shadow-sm hover:shadow-md">
@@ -28,18 +55,11 @@ const HistorySidebar = ({ history = [], onSelect, onDelete, onClear }) => {
                                         <div className="truncate font-medium">{preview}</div>
                                         <div className="text-xs text-slate-400 mt-1">{new Date(item.ts).toLocaleString()}</div>
                                     </button>
-                                    <button onClick={() => onDelete(item.id)} className="text-xs text-red-500 ml-2">删除</button>
                                 </div>
                             </div>
                         );
                     })}
                 </div>
-
-                {history.length > 0 && (
-                    <div className="mt-3 px-3 pb-4">
-                        <button onClick={onClear} className="w-full text-xs bg-red-50 text-red-600 border border-red-100 rounded px-2 py-1">清空历史</button>
-                    </div>
-                )}
             </div>
         </div>
     );

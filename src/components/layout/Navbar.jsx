@@ -13,7 +13,7 @@ const Navbar = ({ currentPage, navigateTo }) => {
         'hospitals': '医院',
         'doctors': '医生',
         'consultation': '问诊',
-        'appointment': '预约',
+        'appointment': '预约记录',
         'records': '病历',
         'aiInquiry': 'AI问询'
     };
@@ -26,7 +26,7 @@ const Navbar = ({ currentPage, navigateTo }) => {
         'doctorConsultation': '在线问诊',
         'doctorProfile': '个人信息'
     };
-    
+
     // 管理员医生额外菜单
     const adminDoctorPageLabels = {
         'doctorSchedule': '排班管理'
@@ -53,25 +53,25 @@ const Navbar = ({ currentPage, navigateTo }) => {
             setRole(null);
             return;
         }
-        
+
         // 同时检查access_token和authToken
         const token = localStorage.getItem('access_token') || localStorage.getItem('authToken');
         const rawUser = localStorage.getItem('user');
         const userRole = localStorage.getItem('role');
-        
+
         console.log('[Navbar] 检查登录状态:', { token: !!token, user: !!rawUser, role: userRole, rawUser });
-        
+
         if (rawUser) {
-            try { 
+            try {
                 let parsedUser = JSON.parse(rawUser);
                 console.log('[Navbar] 解析后的用户信息:', parsedUser);
-                
+
                 // 如果解析出的对象包含 token 字段且有嵌套的 user 对象，则提取真正的 user 对象
                 if (parsedUser.token && parsedUser.user && typeof parsedUser.user === 'object') {
                     console.log('[Navbar] 检测到嵌套的user对象，提取真正的user');
                     parsedUser = parsedUser.user;
                 }
-                
+
                 // 优先使用后端返回的 role，其次才是 localStorage 中保存的 role
                 const finalRole = parsedUser.role || userRole || 'user';
                 console.log('[Navbar] 最终设置的role:', finalRole, '(来自parsedUser.role:', parsedUser.role, ')');
@@ -93,7 +93,7 @@ const Navbar = ({ currentPage, navigateTo }) => {
     // 获取待审核医生数量
     const fetchPendingDoctorsCount = async () => {
         if (role !== 'admin') return;
-        
+
         try {
             const result = await getDoctorAudits({ status: 'pending', page: 1, page_size: 1 });
             if (result && typeof result.count === 'number') {
@@ -109,7 +109,7 @@ const Navbar = ({ currentPage, navigateTo }) => {
         // 组件挂载时检查登录状态
         console.log('[Navbar] 组件挂载，首次检查登录状态');
         checkLoginStatus();
-        
+
         const onStorage = (e) => {
             console.log('[Navbar] 检测到 storage/localStorageUpdated 事件:', e.type, e.key);
             // 自定义事件没有 key 属性，所以需要特别处理
@@ -140,17 +140,17 @@ const Navbar = ({ currentPage, navigateTo }) => {
     useEffect(() => {
         if (role === 'admin') {
             fetchPendingDoctorsCount();
-            
+
             // 每30秒刷新一次待审核数量
             const interval = setInterval(fetchPendingDoctorsCount, 30000);
-            
+
             // 监听医生审核更新事件
             const handleAuditUpdate = () => {
                 console.log('[Navbar] 检测到医生审核更新，刷新待审核数量');
                 fetchPendingDoctorsCount();
             };
             window.addEventListener('doctorAuditUpdated', handleAuditUpdate);
-            
+
             return () => {
                 clearInterval(interval);
                 window.removeEventListener('doctorAuditUpdated', handleAuditUpdate);
@@ -164,7 +164,7 @@ const Navbar = ({ currentPage, navigateTo }) => {
             authToken: localStorage.getItem('authToken'),
             user: localStorage.getItem('user')
         });
-        
+
         try {
             console.log('调用api.logout()');
             await api.logout();
@@ -173,12 +173,12 @@ const Navbar = ({ currentPage, navigateTo }) => {
             console.error('api.logout()调用失败:', e);
             // ignore server error, still clear client state
         }
-        
+
         console.log('重置用户状态');
         setUser(null);
         setRole(null);
         localStorage.removeItem('role');
-        
+
         console.log('跳转到首页');
         navigateTo('');
         console.log('=== Navbar登出函数执行结束 ===');
@@ -212,39 +212,39 @@ const Navbar = ({ currentPage, navigateTo }) => {
                                     )}
                                 </button>
                             ))
-                            : role === 'doctor' 
-                            ? (
-                                <>
-                                    {Object.entries(doctorPageLabels).map(([page, label]) => (
-                                        <button
-                                            key={page}
-                                            onClick={() => navigateTo(page)}
-                                            className={`hover:text-cyan-600 transition ${currentPage === page ? 'text-cyan-600 font-bold' : ''}`}
-                                        >
-                                            {label}
-                                        </button>
-                                    ))}
-                                    {/* 管理员医生额外显示排班管理 */}
-                                    {user?.is_admin && Object.entries(adminDoctorPageLabels).map(([page, label]) => (
-                                        <button
-                                            key={page}
-                                            onClick={() => navigateTo(page)}
-                                            className={`hover:text-cyan-600 transition ${currentPage === page ? 'text-cyan-600 font-bold' : ''}`}
-                                        >
-                                            {label}
-                                        </button>
-                                    ))}
-                                </>
-                            )
-                            : ['home', 'model3d', 'hospitals', 'doctors', 'consultation', 'appointment', 'records', 'aiInquiry'].map(page => (
-                                <button
-                                    key={page}
-                                    onClick={() => navigateTo(page)}
-                                    className={`hover:text-cyan-600 transition ${currentPage === page ? 'text-cyan-600 font-bold' : ''}`}
-                                >
-                                    {userPageLabels[page]}
-                                </button>
-                            ))
+                            : role === 'doctor'
+                                ? (
+                                    <>
+                                        {Object.entries(doctorPageLabels).map(([page, label]) => (
+                                            <button
+                                                key={page}
+                                                onClick={() => navigateTo(page)}
+                                                className={`hover:text-cyan-600 transition ${currentPage === page ? 'text-cyan-600 font-bold' : ''}`}
+                                            >
+                                                {label}
+                                            </button>
+                                        ))}
+                                        {/* 管理员医生额外显示排班管理 */}
+                                        {user?.is_admin && Object.entries(adminDoctorPageLabels).map(([page, label]) => (
+                                            <button
+                                                key={page}
+                                                onClick={() => navigateTo(page)}
+                                                className={`hover:text-cyan-600 transition ${currentPage === page ? 'text-cyan-600 font-bold' : ''}`}
+                                            >
+                                                {label}
+                                            </button>
+                                        ))}
+                                    </>
+                                )
+                                : ['home', 'model3d', 'hospitals', 'doctors', 'consultation', 'appointment', 'records', 'aiInquiry'].map(page => (
+                                    <button
+                                        key={page}
+                                        onClick={() => navigateTo(page)}
+                                        className={`hover:text-cyan-600 transition ${currentPage === page ? 'text-cyan-600 font-bold' : ''}`}
+                                    >
+                                        {userPageLabels[page]}
+                                    </button>
+                                ))
                         }
                     </div>
                 </div>
@@ -253,9 +253,9 @@ const Navbar = ({ currentPage, navigateTo }) => {
                     {/* 按钮在所有屏幕显示，登录状态以 authToken 或 user 判断 */}
                     <div className="flex items-center gap-3">
 
-                        
-                        { /* 修复登录状态判断，确保能正确检测到登录状态 */ }
-                        { user ? (
+
+                        { /* 修复登录状态判断，确保能正确检测到登录状态 */}
+                        {user ? (
                             <>
                                 <button onClick={handleLogout} className="text-sm px-3 py-1 rounded border border-slate-200 hover:bg-slate-50 transition">登出</button>
                             </>
@@ -296,11 +296,11 @@ const Navbar = ({ currentPage, navigateTo }) => {
                         title={user ? (user.name || (user.user && user.user.name) || user.phone || (user.user && user.user.phone)) : '登录'}
                     >
                         <img
-                                                        src={
-                                                                user && (user.avatar || (user.user && user.user.avatar))
-                                                                    ? resolveMediaUrl(user.avatar || (user.user && user.user.avatar))
-                                                                    : '/images/avatar-fallback.svg'
-                                                        }
+                            src={
+                                user && (user.avatar || (user.user && user.user.avatar))
+                                    ? resolveMediaUrl(user.avatar || (user.user && user.user.avatar))
+                                    : '/images/avatar-fallback.svg'
+                            }
                             alt={user ? (user.name || (user.user && user.user.name) || user.phone || (user.user && user.user.phone)) : '默认头像'}
                             className="object-cover w-full h-full"
                             onError={(e) => { e.currentTarget.src = '/images/avatar-fallback.svg'; }}
