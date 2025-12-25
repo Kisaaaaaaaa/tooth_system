@@ -24,6 +24,7 @@ const AppointmentsPage = () => {
             case 'upcoming': return { border: 'border-cyan-500', badge: 'bg-cyan-100 text-cyan-700' };
             case 'checked-in': return { border: 'border-purple-500', badge: 'bg-purple-100 text-purple-700' };
             case 'completed': return { border: 'border-green-500', badge: 'bg-green-100 text-green-700' };
+            case 'no-show': return { border: 'border-rose-500', badge: 'bg-rose-100 text-rose-700' };
             case 'cancelled': return { border: 'border-rose-500', badge: 'bg-rose-100 text-rose-700' };
             default: return { border: 'border-slate-300', badge: 'bg-slate-100 text-slate-500' };
         }
@@ -167,6 +168,7 @@ const AppointmentsPage = () => {
                             <option value="upcoming">待就诊</option>
                             <option value="checked-in">已签到</option>
                             <option value="completed">已完成</option>
+                            <option value="no-show">迟到</option>
                             <option value="cancelled">已取消</option>
                         </select>
                         <button onClick={() => fetchList(1, statusFilter)} className="px-3 py-2 bg-cyan-600 text-white rounded">刷新</button>
@@ -188,7 +190,15 @@ const AppointmentsPage = () => {
                                 <div className="md:w-3/4 w-full">
                                     <div className="flex items-center gap-2 mb-1 flex-wrap">
                                         <span className={`px-2 py-0.5 rounded text-xs font-bold uppercase ${color.badge}`}>
-                                            {apt.status === 'upcoming' ? '待就诊' : apt.status === 'completed' ? '已完成' : apt.status === 'checked-in' ? '已签到' : '已取消'}
+                                            {apt.status === 'upcoming'
+                                                ? '待就诊'
+                                                : apt.status === 'completed'
+                                                    ? '已完成'
+                                                    : apt.status === 'checked-in'
+                                                        ? '已签到'
+                                                        : apt.status === 'no-show'
+                                                            ? '迟到'
+                                                            : '已取消'}
                                         </span>
                                         <div className="min-w-0">
                                             <span className="text-sm text-slate-400 block truncate">{hospital.name}</span>
