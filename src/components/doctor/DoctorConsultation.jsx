@@ -19,9 +19,29 @@ const DoctorConsultation = () => {
         fetchConsultationSessions();
     }, []);
 
-    // 匿名化用户显示 - 保护隐私
-    const getAnonymousName = () => {
-        return '匿名患者';
+    // 获取患者姓名
+    const getPatientName = (session) => {
+        // 优先使用 user_name 或 patient_name
+        if (session.user_name) return session.user_name;
+        if (session.patient_name) return session.patient_name;
+        
+        // 如果有 user 对象
+        if (session.user) {
+            if (session.user.name) return session.user.name;
+            if (session.user.phone) return `患者 ${session.user.phone.slice(-4)}`;
+        }
+        
+        // 如果有 patient 对象
+        if (session.patient) {
+            if (session.patient.name) return session.patient.name;
+            if (session.patient.phone) return `患者 ${session.patient.phone.slice(-4)}`;
+        }
+        
+        // 最后尝试使用 phone 字段
+        if (session.phone) return `患者 ${session.phone.slice(-4)}`;
+        if (session.user_phone) return `患者 ${session.user_phone.slice(-4)}`;
+        
+        return '患者';
     };
 
     // 获取问诊会话列表
@@ -227,7 +247,7 @@ const DoctorConsultation = () => {
                                 >
                                     <div className="flex items-start justify-between mb-2">
                                         <h3 className="font-bold text-slate-800 text-sm">
-                                            {getAnonymousName()}
+                                            {getPatientName(session)}
                                         </h3>
                                         <span className="text-xs text-slate-400">
                                             {session.created_at ? new Date(session.created_at).toLocaleTimeString() : ''}
@@ -259,7 +279,7 @@ const DoctorConsultation = () => {
                             <div className="p-4 border-b border-slate-100 bg-gradient-to-r from-blue-50 to-cyan-50 flex items-center justify-between">
                                 <div>
                                     <h3 className="font-bold text-slate-800">
-                                        {getAnonymousName()}
+                                        {getPatientName(selectedSession)}
                                     </h3>
                                     <p className="text-sm text-slate-500 flex items-center gap-1">
                                         <Clock size={14} />
