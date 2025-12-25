@@ -36,6 +36,43 @@ const ConsultationPage = ({ currentDoctor, consultationAuthRequired = false }) =
 
     const listRef = useRef(null);
     const stickToBottomRef = useRef(true);
+    const pollingTimerRef = useRef(null);
+
+    const normalizeMessage = (m, idx) => ({
+        id: m.id ?? idx,
+        sender: m.sender || 'doctor',
+        text: m.text || m.content || '',
+        time: m.time || m.created_at || ''
+    });
+
+    const mergeMessagesById = (prev, next) => {
+        const map = new Map();
+        // 先放 prev，保留本地 pending/temp 消息
+        (prev || []).forEach((m, i) => {
+            if (!m) return;
+            const key = m.id ?? `idx-${i}`;
+            map.set(key, m);
+        });
+        // 再放 next，真实消息覆盖掉同 id 的本地消息
+        (next || []).forEach((m, i) => {
+            if (!m) return;
+            const key = m.id ?? `idx-${i}`;
+            map.set(key, m);
+        });
+        // 兼容后端 retrieve 是按 time 正序返回；如果遇到未排序，做一次稳定排序
+        const merged = Array.from(map.values());
+        merged.sort((a, b) => {
+            const ta = a?.time ? new Date(a.time).getTime() : 0;
+            const tb = b?.time ? new Date(b.time).getTime() : 0;
+            if (ta !== tb) return ta - tb;
+            // time 相同则按 id（数字优先）
+            const ia = typeof a?.id === 'number' ? a.id : Number.NaN;
+            const ib = typeof b?.id === 'number' ? b.id : Number.NaN;
+            if (!Number.isNaN(ia) && !Number.isNaN(ib) && ia !== ib) return ia - ib;
+            return 0;
+        });
+        return merged;
+    };
 
     const isAtBottom = () => {
         const el = listRef.current;
@@ -209,20 +246,21 @@ const ConsultationPage = ({ currentDoctor, consultationAuthRequired = false }) =
         }
     };
 
-    const fetchMessages = async (cid) => {
+    const fetchMessages = async (cid, opts = {}) => {
         const id = cid || consultationId;
         if (!id) return;
-        setLoading(true);
+        const { merge = false, silent = false } = opts;
+        if (!silent) setLoading(true);
         setError('');
         try {
             const resp = await consultationApi.GetConsultationDetail(id, { page_size: 100 });
             const remoteMessages = resp.data?.messages?.results || resp.data?.messages || resp.messages || [];
-            setMessages(remoteMessages.map((m, idx) => ({
-                id: m.id || idx,
-                sender: m.sender || 'doctor',
-                text: m.text || m.content || '',
-                time: m.time || m.created_at || ''
-            })));
+            const normalized = remoteMessages.map(normalizeMessage);
+            if (merge) {
+                setMessages((prev) => mergeMessagesById(prev, normalized));
+            } else {
+                setMessages(normalized);
+            }
             // 如果接口返回医生详情且当前缺失，回填
             if (!doctor && resp.data?.doctor) setDoctor(resp.data.doctor);
         } catch (err) {
@@ -230,9 +268,37 @@ const ConsultationPage = ({ currentDoctor, consultationAuthRequired = false }) =
             // 如果获取消息失败且没有现有消息，使用空数组
             if (!messages.length) setMessages([]);
         } finally {
-            setLoading(false);
+            if (!silent) setLoading(false);
         }
     };
+
+    useEffect(() => {
+        // 仅在已选择会话且通过登录校验时才轮询
+        if (!consultationId) return;
+        if (consultationAuthRequired && !isAuthed()) return;
+
+        const POLL_MS = 2500;
+        let cancelled = false;
+
+        const tick = async () => {
+            if (cancelled) return;
+            // 页面不可见时不拉取，减少压力
+            if (document.visibilityState !== 'visible') return;
+            await fetchMessages(consultationId, { merge: true, silent: true });
+        };
+
+        // 进来先拉一次增量（静默），避免漏掉
+        tick();
+        pollingTimerRef.current = setInterval(tick, POLL_MS);
+
+        return () => {
+            cancelled = true;
+            if (pollingTimerRef.current) {
+                clearInterval(pollingTimerRef.current);
+                pollingTimerRef.current = null;
+            }
+        };
+    }, [consultationId, consultationAuthRequired]);
 
     const formatNow = () => new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 

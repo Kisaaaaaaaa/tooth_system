@@ -16,6 +16,46 @@ const DoctorConsultation = () => {
     const [sending, setSending] = useState(false);
     const [sidebarOpen, setSidebarOpen] = useState(true);
     const listRef = useRef(null);
+    const pollingTimerRef = useRef(null);
+
+    const normalizeMessage = (m, idx) => {
+        // DoctorConsultation 里渲染兼容 msg.content/msg.text、msg.created_at/msg.time
+        const text = m?.content ?? m?.text ?? '';
+        const time = m?.created_at ?? m?.time ?? '';
+        return {
+            ...m,
+            id: m?.id ?? idx,
+            content: m?.content ?? text,
+            text: m?.text ?? text,
+            created_at: m?.created_at ?? time,
+            time: m?.time ?? time,
+        };
+    };
+
+    const mergeMessagesById = (prev, next) => {
+        const map = new Map();
+        (prev || []).forEach((m, i) => {
+            if (!m) return;
+            const key = m.id ?? `idx-${i}`;
+            map.set(key, m);
+        });
+        (next || []).forEach((m, i) => {
+            if (!m) return;
+            const key = m.id ?? `idx-${i}`;
+            map.set(key, m);
+        });
+        const merged = Array.from(map.values());
+        merged.sort((a, b) => {
+            const ta = a?.created_at || a?.time ? new Date(a.created_at || a.time).getTime() : 0;
+            const tb = b?.created_at || b?.time ? new Date(b.created_at || b.time).getTime() : 0;
+            if (ta !== tb) return ta - tb;
+            const ia = typeof a?.id === 'number' ? a.id : Number.NaN;
+            const ib = typeof b?.id === 'number' ? b.id : Number.NaN;
+            if (!Number.isNaN(ia) && !Number.isNaN(ib) && ia !== ib) return ia - ib;
+            return 0;
+        });
+        return merged;
+    };
 
     useEffect(() => {
         fetchConsultationSessions();
@@ -33,23 +73,23 @@ const DoctorConsultation = () => {
         // 优先使用 user_name 或 patient_name
         if (session.user_name) return session.user_name;
         if (session.patient_name) return session.patient_name;
-        
+
         // 如果有 user 对象
         if (session.user) {
             if (session.user.name) return session.user.name;
             if (session.user.phone) return `患者 ${session.user.phone.slice(-4)}`;
         }
-        
+
         // 如果有 patient 对象
         if (session.patient) {
             if (session.patient.name) return session.patient.name;
             if (session.patient.phone) return `患者 ${session.patient.phone.slice(-4)}`;
         }
-        
+
         // 最后尝试使用 phone 字段
         if (session.phone) return `患者 ${session.phone.slice(-4)}`;
         if (session.user_phone) return `患者 ${session.user_phone.slice(-4)}`;
-        
+
         return '患者';
     };
 
@@ -82,9 +122,10 @@ const DoctorConsultation = () => {
     };
 
     // 获取会话详情和消息记录
-    const fetchSessionDetail = async (sessionId) => {
+    const fetchSessionDetail = async (sessionId, opts = {}) => {
         try {
-            setError(null);
+            const { merge = false, silent = false } = opts;
+            if (!silent) setError(null);
             const res = await consultationApi.getConsultationDetail(sessionId);
             console.log('问诊详情响应:', res);
 
@@ -94,7 +135,7 @@ const DoctorConsultation = () => {
 
             if (sessionData && sessionData.id) {
                 setSelectedSession(sessionData);
-                
+
                 // 提取消息，兼容多种数据结构
                 let messages = [];
                 if (sessionData.messages) {
@@ -120,16 +161,46 @@ const DoctorConsultation = () => {
                         messages = Object.values(sessionData.chat_records);
                     }
                 }
-                
+
                 console.log('提取的消息:', messages);
                 console.log('消息数量:', messages.length);
-                setMessages(messages);
+                const normalized = messages.map(normalizeMessage);
+                if (merge) {
+                    setMessages((prev) => mergeMessagesById(prev, normalized));
+                } else {
+                    setMessages(normalized);
+                }
             }
         } catch (err) {
             console.error('获取问诊详情失败:', err);
-            setError('获取问诊详情失败');
+            if (!opts?.silent) setError('获取问诊详情失败');
         }
     };
+
+    // 选中会话后自动轮询刷新消息（无需手动刷新）
+    useEffect(() => {
+        if (!selectedSession?.id) return;
+
+        const POLL_MS = 2500;
+        let cancelled = false;
+
+        const tick = async () => {
+            if (cancelled) return;
+            if (document.visibilityState !== 'visible') return;
+            await fetchSessionDetail(selectedSession.id, { merge: true, silent: true });
+        };
+
+        tick();
+        pollingTimerRef.current = setInterval(tick, POLL_MS);
+
+        return () => {
+            cancelled = true;
+            if (pollingTimerRef.current) {
+                clearInterval(pollingTimerRef.current);
+                pollingTimerRef.current = null;
+            }
+        };
+    }, [selectedSession?.id]);
 
     // 处理选择会话
     const handleSelectSession = (session) => {
@@ -310,11 +381,10 @@ const DoctorConsultation = () => {
                                                     </span>
                                                 </div>
                                                 <div className="mt-1">
-                                                    <span className={`text-xs px-2 py-0.5 rounded-full ${
-                                                        session.status === 'active'
+                                                    <span className={`text-xs px-2 py-0.5 rounded-full ${session.status === 'active'
                                                             ? 'bg-green-100 text-green-700'
                                                             : 'bg-slate-100 text-slate-600'
-                                                    }`}>
+                                                        }`}>
                                                         {session.status === 'active' ? '进行中' : '已结束'}
                                                     </span>
                                                 </div>
@@ -427,18 +497,16 @@ const DoctorConsultation = () => {
                                                     {group.messages.map((msg, idx) => (
                                                         <div
                                                             key={idx}
-                                                            className={`flex ${
-                                                                msg.role === 'doctor' || msg.sender === 'doctor'
+                                                            className={`flex ${msg.role === 'doctor' || msg.sender === 'doctor'
                                                                     ? 'justify-end'
                                                                     : 'justify-start'
-                                                            }`}
+                                                                }`}
                                                         >
                                                             <div
-                                                                className={`max-w-[80%] p-3 rounded-2xl text-sm ${
-                                                                    msg.role === 'doctor' || msg.sender === 'doctor'
+                                                                className={`max-w-[80%] p-3 rounded-2xl text-sm ${msg.role === 'doctor' || msg.sender === 'doctor'
                                                                         ? 'bg-cyan-500 text-white rounded-tr-none'
                                                                         : 'bg-white border border-slate-200 text-slate-700 rounded-tl-none'
-                                                                }`}
+                                                                    }`}
                                                             >
                                                                 {msg.content || msg.text || '（空消息）'}
                                                             </div>

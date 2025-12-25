@@ -59,6 +59,7 @@ const DoctorAppointments = () => {
             upcoming: 'pending',
             'checked-in': 'checked-in',
             completed: 'completed',
+            'no-show': 'no-show',
             cancelled: 'cancelled'
         };
         return map[status] || status;
@@ -70,6 +71,7 @@ const DoctorAppointments = () => {
             pending: { label: '待进行', color: 'bg-yellow-100 text-yellow-800', icon: Clock },
             'checked-in': { label: '已签到', color: 'bg-blue-100 text-blue-800', icon: Check },
             completed: { label: '已完成', color: 'bg-green-100 text-green-800', icon: Check },
+            'no-show': { label: '迟到', color: 'bg-red-100 text-red-800', icon: AlertCircle },
             cancelled: { label: '已取消', color: 'bg-red-100 text-red-800', icon: AlertCircle }
         };
         const config = statusMap[normalizedStatus] || { label: normalizedStatus, color: 'bg-slate-100 text-slate-800' };
@@ -113,7 +115,7 @@ const DoctorAppointments = () => {
     const normalizedList = normalizeAppointments();
     const pendingList = normalizedList.filter(a => a.status === 'pending');
     const checkedInList = normalizedList.filter(a => a.status === 'checked-in');
-    const completedList = normalizedList.filter(a => a.status === 'completed');
+    const completedList = normalizedList.filter(a => a.status === 'completed' || a.status === 'no-show');
 
     const pendingCount = pendingList.length;
     const checkedInCount = checkedInList.length;
@@ -182,16 +184,15 @@ const DoctorAppointments = () => {
                     <button
                         key={status}
                         onClick={() => setFilter(status)}
-                        className={`px-4 py-2 rounded-lg font-medium transition ${
-                            filter === status
+                        className={`px-4 py-2 rounded-lg font-medium transition ${filter === status
                                 ? 'bg-blue-600 text-white'
                                 : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-50'
-                        }`}
+                            }`}
                     >
-                        {status === 'all' ? '全部' : 
-                         status === 'pending' ? '待进行' : 
-                         status === 'checked-in' ? '已签到' : 
-                         '已完成'}
+                        {status === 'all' ? '全部' :
+                            status === 'pending' ? '待进行' :
+                                status === 'checked-in' ? '已签到' :
+                                    '已完成'}
                     </button>
                 ))}
             </div>
