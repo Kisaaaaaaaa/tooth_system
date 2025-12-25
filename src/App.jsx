@@ -10,6 +10,7 @@ import DoctorDetailPage from './components/pages/DoctorDetailPage';
 import ConsultationPage from './components/pages/ConsultationPage';
 import AppointmentsPage from './components/pages/AppointmentsPage';
 import RecordsPage from './components/pages/RecordsPage';
+import RecordDetailPage from './components/pages/RecordDetailPage';
 import AiInquiryPage from './components/pages/AiInquiryPage';
 import AdminDashboard from './components/admin/AdminDashboard';
 import ThreeDModelPage from './components/pages/ThreeDModelPage';
@@ -180,6 +181,11 @@ const AppWithRouter = () => {
                 <Route path="/records" element={
                     <div className="max-w-7xl mx-auto px-4 md:px-6">
                         <RecordsPage />
+                    </div>
+                } />
+                <Route path="/records/:id" element={
+                    <div className="max-w-7xl mx-auto px-4 md:px-6">
+                        <RecordDetailPage />
                     </div>
                 } />
                 <Route path="/aiInquiry" element={

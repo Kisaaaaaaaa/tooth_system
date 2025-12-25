@@ -22,15 +22,15 @@ function handleResp(resp) {
             return resp.json().then(j => {
                 // 尝试解析错误信息，提取用户友好的提示
                 let errorMessage = '';
-                
+
                 if (j.message) {
                     try {
                         const messageStr = j.message;
                         const errors = [];
-                        
+
                         // 直接使用正则表达式提取所有中文错误信息
                         const errorMatches = messageStr.match(/'([^']*[\u4e00-\u9fa5]+[^']*)'/g);
-                        
+
                         if (errorMatches) {
                             // 移除引号并将所有错误信息合并
                             errorMatches.forEach(match => {
@@ -46,12 +46,12 @@ function handleResp(resp) {
                         errorMessage = j.message;
                     }
                 }
-                
+
                 // 如果没有提取到错误信息，使用默认的错误提示
                 if (!errorMessage) {
                     errorMessage = `${resp.status} ${resp.statusText}`;
                 }
-                
+
                 const error = new Error(errorMessage);
                 error.status = resp.status;
                 error.body = j;
@@ -70,25 +70,30 @@ function handleResp(resp) {
 
 export async function listRecords(params = {}) {
     const qs = buildQuery(params);
-    const url = `/records${qs}`;
+    // DRF 风格接口通常要求末尾带斜杠；同时与接口文档保持一致：GET /records/
+    const url = `/records/${qs}`;
     const headers = getAuthHeaders();
     const opts = { method: 'GET', headers, redirect: 'follow' };
     const resp = await fetch(API_ROOT + url, opts);
-    return handleResp(resp);
+    const payload = await handleResp(resp);
+    // 兼容后端通用包装：{ code, message, data }
+    return payload?.data ?? payload;
 }
 
 export async function getRecord(id) {
     const headers = getAuthHeaders();
-    const resp = await fetch(API_ROOT + `/records/${id}`, { method: 'GET', headers, redirect: 'follow' });
-    return handleResp(resp);
+    const resp = await fetch(API_ROOT + `/records/${id}/`, { method: 'GET', headers, redirect: 'follow' });
+    const payload = await handleResp(resp);
+    return payload?.data ?? payload;
 }
 
 export async function rateRecord(id, { rating, comment }) {
     const headers = getAuthHeaders();
     headers.append('Content-Type', 'application/json');
     const body = JSON.stringify({ rating, comment });
-    const resp = await fetch(API_ROOT + `/records/${id}/rating`, { method: 'POST', headers, body, redirect: 'follow' });
-    return handleResp(resp);
+    const resp = await fetch(API_ROOT + `/records/${id}/rating/`, { method: 'POST', headers, body, redirect: 'follow' });
+    const payload = await handleResp(resp);
+    return payload?.data ?? payload;
 }
 
 const recordsApi = { listRecords, getRecord, rateRecord };
