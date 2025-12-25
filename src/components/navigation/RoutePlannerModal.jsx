@@ -25,6 +25,18 @@ export default function RoutePlannerModal({
     const mapRef = useRef(null);
     const serviceRef = useRef(null);
 
+    // 起点选择：默认自动定位，也允许用户在地图上点选起点
+    const [startMode, setStartMode] = useState('auto'); // 'auto' | 'pick'
+    const [pickedLocation, setPickedLocation] = useState(null); // { longitude, latitude }
+    const pickedMarkerRef = useRef(null);
+    const currentStartModeRef = useRef(startMode);
+
+    const effectiveFromLocation = startMode === 'pick' ? pickedLocation : userLocation;
+
+    useEffect(() => {
+        currentStartModeRef.current = startMode;
+    }, [startMode]);
+
     useEffect(() => {
         if (!open) {
             setMapError(null);
@@ -36,8 +48,23 @@ export default function RoutePlannerModal({
             setWarningModalText('');
             setWarningSuggestMode(null);
             warningLastKeyRef.current = '';
+
+            setStartMode('auto');
+            setPickedLocation(null);
+            pickedMarkerRef.current = null;
         }
     }, [open]);
+
+    const clearPickedMarker = () => {
+        try {
+            if (pickedMarkerRef.current && mapRef.current) {
+                mapRef.current.remove(pickedMarkerRef.current);
+            }
+        } catch {
+            // ignore
+        }
+        pickedMarkerRef.current = null;
+    };
 
     const { toName, toLngLat } = useMemo(() => {
         const name = hospital?.name || '医院';
@@ -69,7 +96,7 @@ export default function RoutePlannerModal({
                 return;
             }
 
-            const hasFrom = userLocation?.longitude != null && userLocation?.latitude != null;
+            const hasFrom = effectiveFromLocation?.longitude != null && effectiveFromLocation?.latitude != null;
             const hasTo = !!finalToLngLat;
 
             // 切换方式/重新规划前先清理
@@ -92,7 +119,7 @@ export default function RoutePlannerModal({
                     markers.push(new AMap.Marker({ position: finalToLngLat, title: toName }));
                 }
                 if (hasFrom) {
-                    markers.push(new AMap.Marker({ position: [userLocation.longitude, userLocation.latitude], title: '我的位置' }));
+                    markers.push(new AMap.Marker({ position: [effectiveFromLocation.longitude, effectiveFromLocation.latitude], title: startMode === 'pick' ? '我的起点（地图选点）' : '我的位置' }));
                 }
                 if (markers.length) {
                     map.add(markers);
@@ -102,13 +129,13 @@ export default function RoutePlannerModal({
                 setDrivingDebug({
                     reason: 'missing_points',
                     routeMode,
-                    from: hasFrom ? [userLocation.longitude, userLocation.latitude] : null,
+                    from: hasFrom ? [effectiveFromLocation.longitude, effectiveFromLocation.latitude] : null,
                     to: hasTo ? finalToLngLat : null,
                 });
                 return;
             }
 
-            const start = new AMap.LngLat(userLocation.longitude, userLocation.latitude);
+            const start = new AMap.LngLat(effectiveFromLocation.longitude, effectiveFromLocation.latitude);
             const end = new AMap.LngLat(finalToLngLat[0], finalToLngLat[1]);
 
             const service = (() => {
@@ -147,7 +174,7 @@ export default function RoutePlannerModal({
                         message,
                         rawResult: result,
                         routeMode,
-                        from: [userLocation.longitude, userLocation.latitude],
+                        from: [effectiveFromLocation.longitude, effectiveFromLocation.latitude],
                         to: finalToLngLat,
                     });
 
@@ -233,7 +260,7 @@ export default function RoutePlannerModal({
                         status,
                         routeMode,
                         parsed: { distance, time, warned: warned || null },
-                        from: [userLocation.longitude, userLocation.latitude],
+                        from: [effectiveFromLocation.longitude, effectiveFromLocation.latitude],
                         to: finalToLngLat,
                     });
                     setMapError(null);
@@ -253,7 +280,7 @@ export default function RoutePlannerModal({
         if (!open) return;
         if (!amapRef.current || !mapRef.current) return;
         planRoute({ AMap: amapRef.current, map: mapRef.current });
-    }, [open, routeMode, userLocation?.longitude, userLocation?.latitude, finalToLngLat?.[0], finalToLngLat?.[1]]);
+    }, [open, routeMode, effectiveFromLocation?.longitude, effectiveFromLocation?.latitude, finalToLngLat?.[0], finalToLngLat?.[1]]);
 
     if (!open) return null;
 
@@ -297,6 +324,52 @@ export default function RoutePlannerModal({
                     ) : (
                         <>
                             <div className="space-y-2">
+                                <div className="text-xs text-slate-600">
+                                    起点：
+                                    <button
+                                        type="button"
+                                        className={startMode === 'auto' ? 'ml-2 px-2 py-1 rounded-full bg-cyan-600 text-white' : 'ml-2 px-2 py-1 rounded-full bg-slate-100 text-slate-700 hover:bg-slate-200'}
+                                        onClick={() => {
+                                            setStartMode('auto');
+                                            setPickedLocation(null);
+                                            clearPickedMarker();
+                                        }}
+                                    >
+                                        自动定位
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className={startMode === 'pick' ? 'ml-2 px-2 py-1 rounded-full bg-cyan-600 text-white' : 'ml-2 px-2 py-1 rounded-full bg-slate-100 text-slate-700 hover:bg-slate-200'}
+                                        onClick={() => {
+                                            setStartMode('pick');
+                                        }}
+                                    >
+                                        地图选点
+                                    </button>
+                                    {startMode === 'auto' && userLocation?.accuracy != null && (
+                                        <span className="ml-2 text-slate-500">(精度约 {Math.round(userLocation.accuracy)}m)</span>
+                                    )}
+                                    {startMode === 'pick' && (
+                                        <span className="ml-2 text-slate-500">(请在地图上点击设置起点)</span>
+                                    )}
+                                </div>
+
+                                {startMode === 'pick' && pickedLocation && (
+                                    <div className="text-xs text-slate-700 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 flex flex-wrap items-center gap-2">
+                                        <span>已选择起点</span>
+                                        <button
+                                            type="button"
+                                            className="ml-auto px-2 py-1 rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200"
+                                            onClick={() => {
+                                                setPickedLocation(null);
+                                                clearPickedMarker();
+                                            }}
+                                        >
+                                            清除选点
+                                        </button>
+                                    </div>
+                                )}
+
                                 <div className="flex flex-wrap gap-2">
                                     {[
                                         { key: 'walking', label: '步行' },
@@ -345,15 +418,15 @@ export default function RoutePlannerModal({
                                             onRetry?.();
                                         }}
                                     >
-                                        重新定位并规划
+                                        {startMode === 'auto' ? '重新定位并规划' : '重新规划'}
                                     </button>
                                 </div>
 
                                 <MapContainer
                                     height={700}
                                     center={
-                                        userLocation?.longitude != null && userLocation?.latitude != null
-                                            ? [userLocation.longitude, userLocation.latitude]
+                                        effectiveFromLocation?.longitude != null && effectiveFromLocation?.latitude != null
+                                            ? [effectiveFromLocation.longitude, effectiveFromLocation.latitude]
                                             : (finalToLngLat || [116.397428, 39.90923])
                                     }
                                     zoom={12}
@@ -362,6 +435,35 @@ export default function RoutePlannerModal({
                                     onMapReady={({ AMap, map }) => {
                                         amapRef.current = AMap;
                                         mapRef.current = map;
+
+                                        // 地图点选起点：只绑定一次 handler，并在卸载时移除
+                                        if (!map.__routePlannerPickHandler) {
+                                            map.__routePlannerPickHandler = (evt) => {
+                                                // 注意：这里不直接读取 startMode，避免闭包拿旧值；用 ref 承载当前模式
+                                                // currentStartModeRef 在下方 useEffect 中保持最新
+                                                if (currentStartModeRef.current !== 'pick') return;
+                                                const lngLat = evt?.lnglat;
+                                                const lng = lngLat?.getLng?.();
+                                                const lat = lngLat?.getLat?.();
+                                                if (typeof lng !== 'number' || typeof lat !== 'number') return;
+
+                                                setPickedLocation({ longitude: lng, latitude: lat });
+                                                setMapError(null);
+
+                                                try {
+                                                    clearPickedMarker();
+                                                    pickedMarkerRef.current = new AMap.Marker({
+                                                        position: [lng, lat],
+                                                        title: '我的起点（地图选点）',
+                                                    });
+                                                    map.add(pickedMarkerRef.current);
+                                                } catch {
+                                                    // ignore
+                                                }
+                                            };
+                                            map.on('click', map.__routePlannerPickHandler);
+                                        }
+
                                         // map 初次 ready 后立刻规划一次
                                         planRoute({ AMap, map });
                                     }}

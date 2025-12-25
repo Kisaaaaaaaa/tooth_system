@@ -183,9 +183,10 @@ function HeroCarousel({ navigateTo }) {
     const backgroundImages = [
         '/images/儿童牙医.png',
         '/images/讲解.png',
-        '/images/牙医.png',
         '/images/环境.png',
-        '/images/治疗环境.jpg'
+        '/images/治疗环境.jpg',
+        '/images/器械.jpg',
+        '/images/诊所环境.png'
     ];
 
     const [currentSlide, setCurrentSlide] = useState(0);
@@ -194,7 +195,7 @@ function HeroCarousel({ navigateTo }) {
     useEffect(() => {
         const interval = setInterval(() => {
             setCurrentSlide((prev) => (prev + 1) % backgroundImages.length);
-        }, 5000);
+        }, 3000);
 
         return () => clearInterval(interval);
     }, []);
