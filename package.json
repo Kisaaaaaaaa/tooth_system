@@ -12,6 +12,7 @@
     "@amap/amap-jsapi-loader": "^1.0.1",
     "lucide-react": "^0.263.1",
     "react": "^18.2.0",
+    "react-datepicker": "^9.1.0",
     "react-dom": "^18.2.0",
     "react-router-dom": "^7.10.1",
     "three": "^0.181.2"
