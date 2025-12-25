@@ -109,12 +109,25 @@ const Register = ({ navigateTo }) => {
         }
     }, []);
 
+    // 若已登录且选择医生身份，直接进入医生申请步骤，避免重复注册错误
+    useEffect(() => {
+        if (hasToken && role === 'doctor' && step === 'register') {
+            setStep('doctorApply');
+        }
+    }, [hasToken, role, step]);
+
     const handleSubmit = async (e) => {
         e.preventDefault();
         setError('');
 
         if (!validatePhone(phone)) {
             setError('请输入有效的电话号码（仅数字，11位）');
+            return;
+        }
+
+        // 已登录且是医生注册，跳过注册直接进入医生申请
+        if (role === 'doctor' && hasToken) {
+            setStep('doctorApply');
             return;
         }
 
@@ -141,6 +154,14 @@ const Register = ({ navigateTo }) => {
             navigateTo('');
         } catch (err) {
             const msg = (err && err.message) ? err.message : JSON.stringify(err);
+            // 如果后端提示手机号已存在，前端直接进入医生申请步骤，不再显示错误
+            const existsPatterns = ['已存在', '手机号', 'UNIQUE', 'unique'];
+            const hitExists = existsPatterns.some(p => String(msg).includes(p));
+            if (role === 'doctor' && hitExists) {
+                setError('');
+                setStep('doctorApply');
+                return;
+            }
             setError(msg || '注册失败');
         }
     };
