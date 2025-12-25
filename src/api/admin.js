@@ -197,6 +197,39 @@ export async function rejectDoctor(doctorId, reason = '') {
     return result;
 }
 
+/**
+ * 设置医生为医院管理员
+ * @param {number} doctorId - 医生ID
+ * @returns {Promise<Object>}
+ */
+export async function setDoctorAsAdmin(doctorId) {
+    const myHeaders = new Headers();
+    myHeaders.append('Accept', 'application/json');
+    const token = localStorage.getItem('access_token') || localStorage.getItem('authToken');
+    if (token) {
+        myHeaders.append('Authorization', `Bearer ${token}`);
+    }
+    
+    const requestOptions = {
+        method: 'POST',
+        headers: myHeaders,
+        redirect: 'follow'
+    };
+    
+    const url = `${API_BASE}/doctors/${doctorId}/set-admin/`;
+    console.log('[setDoctorAsAdmin] 请求URL:', url);
+    const res = await fetch(url, requestOptions);
+    const result = await handleResponse(res);
+    console.log('[setDoctorAsAdmin] API响应:', result);
+    
+    // 后端返回格式: { code, message, data: {...} }，解包数据
+    if (result && result.data) {
+        console.log('[setDoctorAsAdmin] 设置成功', result.data);
+        return result.data;
+    }
+    return result;
+}
+
 // 医院管理相关API
 /**
  * 获取医院列表
@@ -470,6 +503,7 @@ export default {
     getApprovedDoctors,
     approveDoctor,
     rejectDoctor,
+    setDoctorAsAdmin,
     getHospitals,
     addHospital,
     uploadHospitalImage,

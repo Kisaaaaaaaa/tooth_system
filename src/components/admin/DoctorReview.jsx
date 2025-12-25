@@ -11,12 +11,22 @@ const DoctorReview = () => {
   const [operating, setOperating] = useState(null);
   const [rejectModal, setRejectModal] = useState(null); // { id, doctorName }
   const [rejectReason, setRejectReason] = useState('');
+  const [hospitalsMap, setHospitalsMap] = useState({});
 
   // 获取待审核和已通过的医生列表
   const fetchDoctorData = async () => {
     setLoading(true);
     setError(null);
     try {
+      // 先获取医院列表用于ID到名称的映射
+      const hospitalsResponse = await adminApi.getHospitals({ page_size: 500 });
+      const hospitalsList = hospitalsResponse?.results || hospitalsResponse?.data?.results || [];
+      const hospitalsMapping = {};
+      hospitalsList.forEach(h => {
+        if (h.id) hospitalsMapping[h.id] = h.name;
+      });
+      setHospitalsMap(hospitalsMapping);
+
       // 调用真实API获取数据
       const pendingResponse = await adminApi.getDoctorAudits({ status: 'pending', page: 1, page_size: 100 });
       const approvedResponse = await adminApi.getDoctorAudits({ status: 'approved', page: 1, page_size: 100 });
@@ -47,6 +57,12 @@ const DoctorReview = () => {
           console.warn('无效的医生数据:', doctor);
           return null;
         }
+        // 多种方式获取医院名称
+        const hospitalName = doctor.hospital?.name 
+          || doctor.hospital_name 
+          || (doctor.hospital_id && hospitalsMapping[doctor.hospital_id])
+          || null;
+        
         return {
           id: doctor.id,
           name: doctor.name || '未命名医生',
@@ -56,7 +72,9 @@ const DoctorReview = () => {
           status: doctor.audit_status || 'pending',
           avatar: doctor.avatar || '/images/avatar-fallback.svg',
           phone: doctor.user?.phone || '',
-          hospital: doctor.hospital?.name || '未分配医院'
+          hospital: hospitalName,
+          hospital_id: doctor.hospital_id,
+          is_admin: doctor.is_admin || false
         };
       }).filter(item => item !== null);
       
@@ -66,6 +84,12 @@ const DoctorReview = () => {
           console.warn('无效的医生数据:', doctor);
           return null;
         }
+        // 多种方式获取医院名称
+        const hospitalName = doctor.hospital?.name 
+          || doctor.hospital_name 
+          || (doctor.hospital_id && hospitalsMapping[doctor.hospital_id])
+          || null;
+        
         return {
           id: doctor.id,
           name: doctor.name || '未命名医生',
@@ -75,7 +99,9 @@ const DoctorReview = () => {
           status: doctor.audit_status || 'approved',
           avatar: doctor.avatar || '/images/avatar-fallback.svg',
           phone: doctor.user?.phone || '',
-          hospital: doctor.hospital?.name || '未分配医院'
+          hospital: hospitalName,
+          hospital_id: doctor.hospital_id,
+          is_admin: doctor.is_admin || false
         };
       }).filter(item => item !== null);
       
@@ -158,6 +184,29 @@ const DoctorReview = () => {
     }
   };
 
+  // 设置医生为医院管理员
+  const setAsAdmin = async (id) => {
+    setError(null);
+    setSuccess(null);
+    setOperating(id);
+    try {
+      console.log('开始设置医生为管理员:', id);
+      const result = await adminApi.setDoctorAsAdmin(id);
+      console.log('设置结果:', result);
+      
+      setSuccess(`医生已设置为医院管理员`);
+      
+      // 重新获取数据
+      await fetchDoctorData();
+    } catch (err) {
+      const errMsg = err.message || '设置医院管理员失败';
+      setError(errMsg);
+      console.error('Error setting doctor as admin:', err);
+    } finally {
+      setOperating(null);
+    }
+  };
+
   if (loading) {
     return <div className="flex justify-center items-center h-64">加载中...</div>;
   }
@@ -203,7 +252,13 @@ const DoctorReview = () => {
                     <div className="text-xs px-2 py-1 bg-cyan-100 text-cyan-800 rounded-full">{d.title}</div>
                   </div>
                   <div className="text-sm text-slate-600 mt-1">专长：{d.specialty}</div>
-                  {d.hospital && <div className="text-xs text-slate-500 mt-1">医院：{d.hospital}</div>}
+                  <div className="text-xs text-slate-500 mt-1">
+                    医院：{d.hospital ? (
+                      <span className="font-medium text-cyan-700">{d.hospital}</span>
+                    ) : (
+                      <span className="text-amber-600">未分配</span>
+                    )}
+                  </div>
                   {d.phone && <div className="text-xs text-slate-500">电话：{d.phone}</div>}
                   <div className="text-xs text-slate-400 mt-2">
                     申请于：{new Date(d.appliedAt).toLocaleString()}
@@ -262,16 +317,38 @@ const DoctorReview = () => {
                   <div className="flex items-center gap-2">
                     <div className="font-semibold text-lg">{d.name}</div>
                     <div className="text-xs px-2 py-1 bg-cyan-100 text-cyan-800 rounded-full">{d.title}</div>
+                    {d.is_admin && (
+                      <div className="text-xs px-2 py-1 bg-purple-100 text-purple-800 rounded-full">管理员</div>
+                    )}
                   </div>
                   <div className="text-sm text-slate-600 mt-1">专长：{d.specialty}</div>
-                  {d.hospital && <div className="text-xs text-slate-500 mt-1">医院：{d.hospital}</div>}
+                  <div className="text-xs text-slate-500 mt-1">
+                    医院：{d.hospital ? (
+                      <span className="font-medium text-cyan-700">{d.hospital}</span>
+                    ) : (
+                      <span className="text-amber-600">未分配</span>
+                    )}
+                  </div>
                   {d.phone && <div className="text-xs text-slate-500">电话：{d.phone}</div>}
                   <div className="text-xs text-slate-400 mt-2">
                     通过于：{new Date(d.approvedAt).toLocaleDateString()}
                   </div>
                 </div>
-                <div className="ml-2 text-xs text-slate-400">
-                  <span className="px-2 py-1 bg-green-100 text-green-800 rounded-full">已通过</span>
+                <div className="flex flex-col gap-2 ml-2">
+                  <span className="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs text-center">已通过</span>
+                  {!d.is_admin && d.hospital_id && (
+                    <button
+                      onClick={() => setAsAdmin(d.id)}
+                      disabled={operating === d.id}
+                      className={`px-3 py-1.5 rounded-lg text-xs transition-colors ${
+                        operating === d.id
+                          ? 'bg-purple-400 text-white cursor-not-allowed opacity-75'
+                          : 'bg-purple-600 text-white hover:bg-purple-700'
+                      }`}
+                    >
+                      {operating === d.id ? '处理中...' : '设为管理员'}
+                    </button>
+                  )}
                 </div>
               </div>
             ))

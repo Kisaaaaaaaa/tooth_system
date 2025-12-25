@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from 'react';
-import { Send, MessageSquare, Phone, X, Clock } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Send, MessageSquare, X, Clock, Loader2, AlertCircle, ArrowLeft } from 'lucide-react';
 import consultationApi from '../../api/consultation';
 
 /**
  * 医生端在线问诊页面
- * 医生可以查看患者列表，进行在线咨询，发送和接收消息
+ * 医生可以查看患者列表,进行在线咨询，发送和接收消息
  */
 const DoctorConsultation = () => {
     const [sessions, setSessions] = useState([]);
@@ -14,10 +14,19 @@ const DoctorConsultation = () => {
     const [error, setError] = useState(null);
     const [input, setInput] = useState('');
     const [sending, setSending] = useState(false);
+    const [sidebarOpen, setSidebarOpen] = useState(true);
+    const listRef = useRef(null);
 
     useEffect(() => {
         fetchConsultationSessions();
     }, []);
+
+    // 滚动到底部
+    useEffect(() => {
+        if (listRef.current) {
+            listRef.current.scrollTop = listRef.current.scrollHeight;
+        }
+    }, [messages]);
 
     // 获取患者姓名
     const getPatientName = (session) => {
@@ -197,6 +206,130 @@ const DoctorConsultation = () => {
         }
     };
 
+    // 格式化时间
+    const formatMessageTime = (timeString) => {
+        if (!timeString) return '';
+
+        const now = new Date();
+        const msgDate = new Date(timeString);
+
+        // 如果时间字符串只有时间部分（如"10:00"），则添加今天的日期
+        if (timeString.match(/^\d{2}:\d{2}$/)) {
+            msgDate.setFullYear(now.getFullYear());
+            msgDate.setMonth(now.getMonth());
+            msgDate.setDate(now.getDate());
+        }
+
+        const isToday = msgDate.toDateString() === now.toDateString();
+
+        if (isToday) {
+            // 今天的消息只显示时间
+            return msgDate.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+        } else {
+            // 非今天的消息显示完整日期时间
+            return msgDate.toLocaleString('zh-CN', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        }
+    };
+
+    // 按时间分组消息
+    const groupMessagesByTime = () => {
+        if (!messages.length) return [];
+
+        const grouped = [];
+        let currentGroup = { messages: [], time: formatMessageTime(messages[0].created_at || messages[0].time) };
+
+        messages.forEach((msg, index) => {
+            const msgTime = formatMessageTime(msg.created_at || msg.time);
+
+            // 如果是第一条消息，或者时间间隔超过一定阈值，则创建新分组
+            if (index === 0 || msgTime !== currentGroup.time) {
+                if (index > 0) {
+                    grouped.push({ ...currentGroup });
+                }
+                currentGroup = { messages: [msg], time: msgTime };
+            } else {
+                currentGroup.messages.push(msg);
+            }
+        });
+
+        grouped.push(currentGroup);
+        return grouped;
+    };
+
+    // 渲染侧边栏
+    const renderSidebar = () => {
+        return (
+            <div className={`bg-white border-r border-slate-200 flex flex-col transition-all duration-300 h-full ${sidebarOpen ? 'w-72' : 'w-16'}`}>
+                <div className="p-4 border-b border-slate-100 flex items-center justify-between flex-shrink-0">
+                    <h3 className={`font-bold text-slate-800 transition-all duration-300 ${sidebarOpen ? 'text-lg' : 'text-xs text-center w-full'}`}>
+                        {sidebarOpen ? '问诊列表' : '列表'}
+                    </h3>
+                    <button
+                        onClick={() => setSidebarOpen(!sidebarOpen)}
+                        className="p-1 rounded-full hover:bg-slate-100 transition flex items-center justify-center"
+                    >
+                        <span className={`text-lg font-bold transition-transform duration-300 ${sidebarOpen ? 'rotate-0' : 'rotate-180'}`}>&lt;</span>
+                    </button>
+                </div>
+                <div className="flex-1 overflow-y-auto">
+                    {sessions.length === 0 ? (
+                        <div className="p-6 text-center text-slate-500">
+                            <MessageSquare className="mx-auto mb-3 opacity-30" size={40} />
+                            <p className="text-sm">暂无问诊记录</p>
+                        </div>
+                    ) : (
+                        sessions.map(session => {
+                            const isActive = selectedSession?.id === session.id;
+                            return (
+                                <div
+                                    key={session.id}
+                                    onClick={() => handleSelectSession(session)}
+                                    className={`p-3 cursor-pointer border-b border-slate-100 hover:bg-slate-50 transition ${isActive ? 'bg-cyan-50 border-l-4 border-cyan-500' : ''}`}
+                                >
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-semibold flex-shrink-0">
+                                            {getPatientName(session).charAt(0)}
+                                        </div>
+                                        {sidebarOpen && (
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex items-center justify-between">
+                                                    <h4 className="font-medium text-slate-800 truncate">{getPatientName(session)}</h4>
+                                                    <span className="text-xs text-slate-400">
+                                                        {session.created_at ? new Date(session.created_at).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }) : ''}
+                                                    </span>
+                                                </div>
+                                                <div className="flex items-center gap-2 mt-1">
+                                                    <span className="text-xs text-slate-500 truncate">
+                                                        {session.latest_message || session.content || '开始问诊...'}
+                                                    </span>
+                                                </div>
+                                                <div className="mt-1">
+                                                    <span className={`text-xs px-2 py-0.5 rounded-full ${
+                                                        session.status === 'active'
+                                                            ? 'bg-green-100 text-green-700'
+                                                            : 'bg-slate-100 text-slate-600'
+                                                    }`}>
+                                                        {session.status === 'active' ? '进行中' : '已结束'}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            );
+                        })
+                    )}
+                </div>
+            </div>
+        );
+    };
+
     if (loading) {
         return (
             <div className="flex items-center justify-center min-h-screen">
@@ -209,81 +342,50 @@ const DoctorConsultation = () => {
     }
 
     return (
-        <div className="space-y-6 py-6 animate-fade-in">
-            {/* 错误提示 */}
-            {error && (
-                <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-800">
-                    {error}
-                </div>
-            )}
+        <div className="flex bg-slate-50 animate-fade-in overflow-hidden" style={{ height: 'calc(100vh - 64px)' }}>
+            {/* 侧边栏 - 桌面端 */}
+            <div className="md:block hidden h-full">
+                {renderSidebar()}
+            </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[calc(100vh-120px)]">
-                {/* 左侧：问诊列表 */}
-                <div className="lg:col-span-1 bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden flex flex-col">
-                    <div className="p-4 border-b border-slate-100 bg-gradient-to-r from-blue-50 to-cyan-50">
-                        <h2 className="font-bold text-slate-800 flex items-center gap-2">
-                            <MessageSquare size={20} className="text-blue-600" />
-                            在线问诊列表
-                        </h2>
-                        <p className="text-sm text-slate-500 mt-1">共 {sessions.length} 个问诊</p>
+            {/* 移动端侧边栏按钮 */}
+            <div className="md:hidden absolute top-4 left-4 z-10">
+                <button
+                    onClick={() => setSidebarOpen(!sidebarOpen)}
+                    className="bg-white p-2 rounded-full shadow-md hover:bg-slate-50 transition"
+                >
+                    <ArrowLeft size={20} className={`transform transition-transform ${sidebarOpen ? 'rotate-180' : 'rotate-0'}`} />
+                </button>
+            </div>
+
+            {/* 移动端侧边栏 */}
+            <div className={`md:hidden absolute top-0 left-0 h-full bg-white shadow-lg z-20 transition-all duration-300 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+                {renderSidebar()}
+            </div>
+
+            {/* 主内容区 - 固定高度布局 */}
+            <div className="flex-1 flex flex-col h-full">
+                {/* 错误提示 */}
+                {error && (
+                    <div className="bg-red-50 border-l-4 border-red-500 p-3 flex-shrink-0">
+                        <div className="flex items-center gap-2 text-red-800 text-sm">
+                            <AlertCircle size={16} />
+                            <span>{error}</span>
+                        </div>
                     </div>
+                )}
 
-                    <div className="flex-1 overflow-y-auto">
-                        {sessions.length === 0 ? (
-                            <div className="p-6 text-center text-slate-500">
-                                <MessageSquare className="mx-auto mb-3 opacity-30" size={40} />
-                                <p>暂无问诊记录</p>
-                            </div>
-                        ) : (
-                            sessions.map(session => (
-                                <div
-                                    key={session.id}
-                                    onClick={() => handleSelectSession(session)}
-                                    className={`p-4 border-b border-slate-100 cursor-pointer transition ${
-                                        selectedSession?.id === session.id
-                                            ? 'bg-blue-50 border-l-4 border-l-blue-600'
-                                            : 'hover:bg-slate-50'
-                                    }`}
-                                >
-                                    <div className="flex items-start justify-between mb-2">
-                                        <h3 className="font-bold text-slate-800 text-sm">
-                                            {getPatientName(session)}
-                                        </h3>
-                                        <span className="text-xs text-slate-400">
-                                            {session.created_at ? new Date(session.created_at).toLocaleTimeString() : ''}
-                                        </span>
-                                    </div>
-                                    <p className="text-xs text-slate-600 truncate">
-                                        {session.latest_message || session.content || '开始问诊...'}
-                                    </p>
-                                    <div className="mt-2 flex gap-2">
-                                        <span className={`text-xs px-2 py-1 rounded-full ${
-                                            session.status === 'active'
-                                                ? 'bg-green-100 text-green-700'
-                                                : 'bg-slate-100 text-slate-600'
-                                        }`}>
-                                            {session.status === 'active' ? '进行中' : '已结束'}
-                                        </span>
-                                    </div>
-                                </div>
-                            ))
-                        )}
-                    </div>
-                </div>
-
-                {/* 右侧：聊天区域 */}
-                <div className="lg:col-span-2 bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden flex flex-col">
+                {/* 聊天容器 */}
+                <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
                     {selectedSession ? (
                         <>
-                            {/* 聊天头部 */}
-                            <div className="p-4 border-b border-slate-100 bg-gradient-to-r from-blue-50 to-cyan-50 flex items-center justify-between">
+                            {/* Header */}
+                            <div className="p-3 bg-white border-b border-slate-100 flex justify-between items-center flex-shrink-0">
                                 <div>
-                                    <h3 className="font-bold text-slate-800">
-                                        {getPatientName(selectedSession)}
-                                    </h3>
-                                    <p className="text-sm text-slate-500 flex items-center gap-1">
+                                    <h3 className="font-bold text-slate-800">{getPatientName(selectedSession)}</h3>
+                                    <p className="text-sm text-slate-500 flex items-center gap-1 mt-0.5">
                                         <Clock size={14} />
-                                        {selectedSession.created_at ? new Date(selectedSession.created_at).toLocaleString() : ''}
+                                        {selectedSession.created_at ? new Date(selectedSession.created_at).toLocaleString('zh-CN') : ''}
                                     </p>
                                 </div>
                                 <button
@@ -295,63 +397,81 @@ const DoctorConsultation = () => {
                                 </button>
                             </div>
 
-                            {/* 消息列表 */}
-                            <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50">
+                            {/* 消息区域 - 可滚动，占据剩余空间 */}
+                            <div
+                                ref={listRef}
+                                className="flex-1 overflow-y-auto bg-slate-50"
+                                style={{
+                                    scrollBehavior: 'smooth',
+                                    overflowAnchor: 'auto'
+                                }}
+                            >
                                 {messages.length === 0 ? (
-                                    <div className="flex items-center justify-center h-full text-slate-400">
+                                    <div className="flex flex-col items-center justify-center h-full text-slate-500">
+                                        <MessageSquare className="opacity-30 mb-3" size={40} />
                                         <p>暂无消息</p>
                                     </div>
                                 ) : (
-                                    messages.map((msg, idx) => (
-                                        <div
-                                            key={idx}
-                                            className={`flex ${
-                                                msg.role === 'doctor' || msg.sender === 'doctor'
-                                                    ? 'justify-end'
-                                                    : 'justify-start'
-                                            }`}
-                                        >
-                                            <div
-                                                className={`max-w-xs px-4 py-2 rounded-lg ${
-                                                    msg.role === 'doctor' || msg.sender === 'doctor'
-                                                        ? 'bg-blue-600 text-white rounded-br-none'
-                                                        : 'bg-white text-slate-800 border border-slate-200 rounded-bl-none'
-                                                }`}
-                                            >
-                                                <p className="text-sm">{msg.content || msg.text}</p>
-                                                <p className="text-xs mt-1 opacity-70">
-                                                    {msg.created_at
-                                                        ? new Date(msg.created_at).toLocaleTimeString()
-                                                        : msg.time || ''}
-                                                </p>
+                                    <div className="p-4 space-y-6">
+                                        {groupMessagesByTime().map((group, groupIndex) => (
+                                            <div key={groupIndex} className="space-y-3">
+                                                {/* 时间分隔 */}
+                                                <div className="flex justify-center">
+                                                    <div className="px-3 py-1 bg-slate-200 rounded-full text-xs text-slate-600">
+                                                        {group.time}
+                                                    </div>
+                                                </div>
+
+                                                {/* 消息列表 */}
+                                                <div className="space-y-3">
+                                                    {group.messages.map((msg, idx) => (
+                                                        <div
+                                                            key={idx}
+                                                            className={`flex ${
+                                                                msg.role === 'doctor' || msg.sender === 'doctor'
+                                                                    ? 'justify-end'
+                                                                    : 'justify-start'
+                                                            }`}
+                                                        >
+                                                            <div
+                                                                className={`max-w-[80%] p-3 rounded-2xl text-sm ${
+                                                                    msg.role === 'doctor' || msg.sender === 'doctor'
+                                                                        ? 'bg-cyan-500 text-white rounded-tr-none'
+                                                                        : 'bg-white border border-slate-200 text-slate-700 rounded-tl-none'
+                                                                }`}
+                                                            >
+                                                                {msg.content || msg.text || '（空消息）'}
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
                                             </div>
-                                        </div>
-                                    ))
+                                        ))}
+                                    </div>
                                 )}
                             </div>
 
-                            {/* 输入框 */}
-                            <div className="p-4 border-t border-slate-100 bg-white">
-                                <div className="flex gap-2">
-                                    <input
-                                        type="text"
-                                        value={input}
-                                        onChange={(e) => setInput(e.target.value)}
-                                        onKeyPress={(e) => {
-                                            if (e.key === 'Enter' && !e.shiftKey) {
-                                                handleSendMessage();
-                                            }
-                                        }}
-                                        placeholder="输入回复信息..."
-                                        className="flex-1 px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                        disabled={sending}
-                                    />
+                            {/* 输入框 - 固定在底部 */}
+                            <div className="bg-white border-t border-slate-100 p-3 flex-shrink-0">
+                                <div className="flex gap-3 items-center">
+                                    <div className="flex-1 flex items-center bg-white border border-slate-200 rounded-full px-4 py-2 hover:border-cyan-200 transition-all focus-within:border-cyan-500 focus-within:shadow-lg">
+                                        <input
+                                            type="text"
+                                            value={input}
+                                            onChange={(e) => setInput(e.target.value)}
+                                            onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
+                                            placeholder="输入回复信息，按 Enter 发送"
+                                            className="flex-1 bg-transparent border-none text-sm focus:outline-none disabled:opacity-60 placeholder:text-slate-400"
+                                            disabled={sending}
+                                        />
+                                    </div>
                                     <button
                                         onClick={handleSendMessage}
                                         disabled={sending || !input.trim()}
-                                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition disabled:opacity-50 flex items-center gap-2"
+                                        className="bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 disabled:bg-slate-300 text-white px-5 py-2.5 rounded-full transition-all shadow-lg shadow-cyan-200/50 flex items-center justify-center gap-2 transform hover:scale-105 active:scale-95 hover:shadow-xl disabled:transform-none disabled:opacity-50"
                                     >
-                                        <Send size={18} />
+                                        {sending ? <Loader2 className="animate-spin" size={16} /> : <Send size={18} />}
+                                        <span className="text-sm font-semibold">发送</span>
                                     </button>
                                 </div>
                             </div>

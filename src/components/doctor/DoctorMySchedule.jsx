@@ -240,7 +240,7 @@ const DoctorMySchedule = () => {
                 <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-2">
                         <Clock className="text-blue-500" size={18} />
-                        <h3 className="font-semibold text-slate-800 text-sm">当日待进行/已签到预约</h3>
+                        <h3 className="font-semibold text-slate-800 text-sm">当日待进行预约</h3>
                     </div>
                     {appointmentsLoading && <span className="text-xs text-slate-400">加载中...</span>}
                 </div>
