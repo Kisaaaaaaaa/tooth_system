@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import api from '../../api/auth';
+import * as doctorApi from '../../api/doctor';
 
 const generateCaptcha = (length = 5) => {
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // 去掉易混淆字符
@@ -421,7 +422,36 @@ const Login = ({ navigateTo }) => {
             // 根据 role 判断跳转页面
             let targetPage = '';
             if (userObj && userObj.role === 'doctor') {
-                targetPage = 'doctorAppointments';
+                // 医生角色：需要检查是否是管理员医生
+                console.log('检测到医生角色，准备获取医生个人信息以检查是否是管理员医生');
+                try {
+                    const doctorInfo = await doctorApi.getDoctorMe();
+                    console.log('获取到医生个人信息:', doctorInfo);
+                    
+                    const isAdmin = doctorInfo?.is_admin || false;
+                    console.log('is_admin:', isAdmin);
+                    
+                    // 保存 is_admin 到 localStorage
+                    if (isAdmin) {
+                        localStorage.setItem('is_admin', 'true');
+                        targetPage = 'doctorAppointments'; // 管理员医生首先显示预约管理界面
+                        console.log('医生是管理员，跳转到 doctorAppointments 页面（预约管理）');
+                    } else {
+                        localStorage.setItem('is_admin', 'false');
+                        targetPage = 'doctorAppointments'; // 普通医生
+                        console.log('医生不是管理员，跳转到 doctorAppointments 页面');
+                    }
+                    
+                    // 更新 userObj 的 is_admin 字段并重新保存
+                    userObj.is_admin = isAdmin;
+                    localStorage.setItem('user', JSON.stringify(userObj));
+                    console.log('已更新 user 对象的 is_admin 字段并保存');
+                } catch (error) {
+                    console.error('获取医生个人信息失败:', error);
+                    // 如果获取失败，默认跳转到普通医生界面
+                    targetPage = 'doctorAppointments';
+                    localStorage.setItem('is_admin', 'false');
+                }
             } else if (userObj && userObj.role === 'admin') {
                 targetPage = 'admin';
             } else {

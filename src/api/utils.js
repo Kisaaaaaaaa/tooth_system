@@ -92,3 +92,67 @@ export async function uploadImage(formData) {
 }
 
 export default { buildQuery, resolveMediaUrl, uploadImage };
+
+// 检查用户是否有管理员权限（包括 is_admin 为 true 的医生）
+export function hasAdminAccess() {
+  if (typeof localStorage === 'undefined') {
+    return false;
+  }
+  
+  try {
+    const role = localStorage.getItem('role');
+    const isAdminStr = localStorage.getItem('is_admin');
+    
+    // 如果 role 是 admin，直接返回 true
+    if (role === 'admin') {
+      return true;
+    }
+    
+    // 如果 is_admin 标记为 'true'，也返回 true
+    if (isAdminStr === 'true') {
+      return true;
+    }
+    
+    // 检查 user 对象中的 is_admin 字段
+    const userStr = localStorage.getItem('user');
+    if (userStr) {
+      const user = JSON.parse(userStr);
+      if (user?.is_admin === true || user?.is_admin === 'true') {
+        return true;
+      }
+    }
+    
+    return false;
+  } catch (error) {
+    console.error('检查管理员权限时出错:', error);
+    return false;
+  }
+}
+
+// 获取当前用户的管理员状态
+export function getAdminStatus() {
+  if (typeof localStorage === 'undefined') {
+    return { isAdmin: false, role: null };
+  }
+  
+  try {
+    const role = localStorage.getItem('role');
+    const isAdminStr = localStorage.getItem('is_admin');
+    const userStr = localStorage.getItem('user');
+    
+    let isAdmin = false;
+    if (role === 'admin' || isAdminStr === 'true') {
+      isAdmin = true;
+    } else if (userStr) {
+      const user = JSON.parse(userStr);
+      if (user?.is_admin === true || user?.is_admin === 'true') {
+        isAdmin = true;
+      }
+    }
+    
+    return { isAdmin, role, isAdminDoctor: isAdminStr === 'true' || (userStr && JSON.parse(userStr)?.is_admin) };
+  } catch (error) {
+    console.error('获取管理员状态时出错:', error);
+    return { isAdmin: false, role: null, isAdminDoctor: false };
+  }
+}

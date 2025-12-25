@@ -17,7 +17,25 @@ const AdminLayout = () => {
     }
   })()) : null;
 
-  if (role !== 'admin') {
+  // 获取 is_admin 字段
+  const isAdmin = typeof localStorage !== 'undefined' ? (() => {
+    try {
+      const isAdminStr = localStorage.getItem('is_admin');
+      if (isAdminStr === 'true') return true;
+      
+      const raw = localStorage.getItem('user');
+      if (!raw) return false;
+      const u = JSON.parse(raw);
+      return u?.is_admin === true || u?.is_admin === 'true';
+    } catch {
+      return false;
+    }
+  })() : false;
+
+  // 允许 role === 'admin' 或 is_admin === true 的用户访问
+  const hasAdminAccess = role === 'admin' || isAdmin;
+
+  if (!hasAdminAccess) {
     return (
       <div className="min-h-[60vh] flex items-center justify-center">
         <div className="text-center">
@@ -47,6 +65,7 @@ const AdminLayout = () => {
       localStorage.removeItem('access_token');
       localStorage.removeItem('user');
       localStorage.removeItem('role');
+      localStorage.removeItem('is_admin');
       window.dispatchEvent(new Event('localStorageUpdated'));
     } catch {}
     navigate('/');

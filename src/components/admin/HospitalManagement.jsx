@@ -36,6 +36,12 @@ const HospitalManagement = () => {
   const [selectedDoctorId, setSelectedDoctorId] = useState('');
   const [isAssigning, setIsAssigning] = useState(false);
 
+  // 管理医院医生功能
+  const [showManageDoctorsModal, setShowManageDoctorsModal] = useState(false);
+  const [hospitalDoctors, setHospitalDoctors] = useState([]);
+  const [loadingDoctors, setLoadingDoctors] = useState(false);
+  const [settingAdmin, setSettingAdmin] = useState(null);
+
   // 筛选功能
   const [searchTerm, setSearchTerm] = useState('');
   const [filteredHospitals, setFilteredHospitals] = useState([]);
@@ -78,14 +84,19 @@ const HospitalManagement = () => {
     setFilteredHospitals(filtered);
   }, [hospitals, searchTerm]);
 
-  // 获取已通过审核的医生列表
+  // 获取已通过审核且未分配医院的医生列表
   const fetchApprovedDoctors = async () => {
     try {
       const data = await adminApi.getApprovedDoctors();
       console.log('[HospitalManagement] 已通过审核的医生:', data);
       // 确保返回的是数组
-      const doctorList = Array.isArray(data.results) ? data.results : (Array.isArray(data) ? data : []);
-      setApprovedDoctors(doctorList);
+      let doctorList = Array.isArray(data.results) ? data.results : (Array.isArray(data) ? data : []);
+      
+      // 过滤出未分配医院的医生（hospital_id 为 null 或 undefined）
+      const unassignedDoctors = doctorList.filter(doctor => !doctor.hospital_id);
+      console.log('[HospitalManagement] 未分配医院的医生:', unassignedDoctors);
+      
+      setApprovedDoctors(unassignedDoctors);
     } catch (err) {
       console.error('获取医生列表失败:', err);
       setApprovedDoctors([]);
@@ -98,6 +109,52 @@ const HospitalManagement = () => {
     setSelectedDoctorId('');
     setShowAssignModal(true);
     fetchApprovedDoctors();
+  };
+
+  // 获取医院的医生列表
+  const fetchHospitalDoctors = async (hospitalId) => {
+    setLoadingDoctors(true);
+    try {
+      const data = await adminApi.getDoctorAudits({ status: 'approved', page: 1, page_size: 100 });
+      const doctorList = Array.isArray(data.results) ? data.results : (Array.isArray(data) ? data : []);
+      // 筛选出该医院的医生，并确保包含 is_admin 字段
+      const filtered = doctorList.map(d => ({
+        ...d,
+        is_admin: d.is_admin || false  // 确保 is_admin 字段存在
+      })).filter(d => d.hospital_id === hospitalId);
+      setHospitalDoctors(filtered);
+      console.log('医院医生列表:', filtered);
+    } catch (err) {
+      console.error('获取医院医生列表失败:', err);
+      setHospitalDoctors([]);
+    } finally {
+      setLoadingDoctors(false);
+    }
+  };
+
+  // 打开管理医生模态框
+  const openManageDoctorsModal = (hospital) => {
+    setSelectedHospital(hospital);
+    setShowManageDoctorsModal(true);
+    fetchHospitalDoctors(hospital.id);
+  };
+
+  // 设置医生为管理员
+  const handleSetDoctorAsAdmin = async (doctorId) => {
+    setSettingAdmin(doctorId);
+    setError(null);
+    setSuccess(null);
+    try {
+      await adminApi.setDoctorAsAdmin(doctorId);
+      setSuccess('设置成功');
+      // 刷新医生列表
+      await fetchHospitalDoctors(selectedHospital.id);
+    } catch (err) {
+      setError(err.message || '设置管理员失败');
+      console.error('设置管理员失败:', err);
+    } finally {
+      setSettingAdmin(null);
+    }
   };
 
   // 分配医生到医院
@@ -114,6 +171,11 @@ const HospitalManagement = () => {
     try {
       await adminApi.assignDoctorToHospital(parseInt(selectedDoctorId), selectedHospital.id);
       setSuccess(`成功为 ${selectedHospital.name} 分配医生`);
+      
+      // 从列表中移除已分配的医生
+      const assignedDoctorName = approvedDoctors.find(d => d.id === parseInt(selectedDoctorId))?.name;
+      setApprovedDoctors(approvedDoctors.filter(d => d.id !== parseInt(selectedDoctorId)));
+      
       setShowAssignModal(false);
       setSelectedHospital(null);
       setSelectedDoctorId('');
@@ -596,14 +658,21 @@ const HospitalManagement = () => {
                       </div>
                     </div>
 
-                    {/* 分配医生按钮 */}
-                    <div className="mt-3 pt-3 border-t">
+                    {/* 操作按钮 */}
+                    <div className="mt-3 pt-3 border-t flex gap-2">
                       <button
                         onClick={() => openAssignModal(h)}
-                        className="w-full py-2 px-3 bg-cyan-50 hover:bg-cyan-100 text-cyan-700 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
+                        className="flex-1 py-2 px-3 bg-cyan-50 hover:bg-cyan-100 text-cyan-700 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
                       >
                         <UserPlus size={16} />
                         分配医生
+                      </button>
+                      <button
+                        onClick={() => openManageDoctorsModal(h)}
+                        className="flex-1 py-2 px-3 bg-purple-50 hover:bg-purple-100 text-purple-700 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
+                      >
+                        <Building2 size={16} />
+                        管理医生
                       </button>
                     </div>
                   </div>
@@ -656,6 +725,82 @@ const HospitalManagement = () => {
         initialLng={hospitalForm.longitude}
       />
 
+      {/* 管理医院医生模态框 */}
+      {showManageDoctorsModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[80vh] overflow-hidden flex flex-col">
+            <div className="p-4 border-b flex items-center justify-between flex-shrink-0">
+              <div>
+                <h3 className="text-lg font-medium">管理医院医生</h3>
+                <p className="text-sm text-slate-600 mt-1">{selectedHospital?.name}</p>
+              </div>
+              <button
+                onClick={() => setShowManageDoctorsModal(false)}
+                className="text-slate-400 hover:text-slate-600"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            
+            <div className="p-4 flex-1 overflow-y-auto">
+              {loadingDoctors ? (
+                <div className="flex justify-center items-center h-32">
+                  <div className="text-slate-500">加载中...</div>
+                </div>
+              ) : hospitalDoctors.length === 0 ? (
+                <div className="text-center py-8 text-slate-400">
+                  <Building2 size={40} className="mx-auto mb-2 opacity-50" />
+                  <div>该医院暂无医生</div>
+                  <div className="text-sm mt-1">请先为医院分配医生</div>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {hospitalDoctors.map((doctor) => (
+                    <div key={doctor.id} className="p-3 border rounded-lg bg-slate-50 flex items-start gap-3">
+                      <div className="flex-grow">
+                        <div className="flex items-center gap-2 mb-1">
+                          <div className="font-semibold">{doctor.name}</div>
+                          <div className="text-xs px-2 py-1 bg-cyan-100 text-cyan-800 rounded-full">{doctor.title || '医师'}</div>
+                          {doctor.is_admin && (
+                            <div className="text-xs px-2 py-1 bg-purple-100 text-purple-800 rounded-full">管理员</div>
+                          )}
+                        </div>
+                        <div className="text-sm text-slate-600">
+                          {doctor.specialty && <span>专长：{doctor.specialty}</span>}
+                        </div>
+                        {doctor.user?.phone && (
+                          <div className="text-xs text-slate-500 mt-1">
+                            电话：{doctor.user.phone}
+                          </div>
+                        )}
+                      </div>
+                      {!doctor.is_admin && (
+                        <button
+                          onClick={() => handleSetDoctorAsAdmin(doctor.id)}
+                          disabled={settingAdmin === doctor.id}
+                          className="px-3 py-1.5 bg-purple-600 text-white rounded-lg text-xs hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        >
+                          {settingAdmin === doctor.id ? '设置中...' : '设为管理员'}
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="p-4 border-t flex-shrink-0">
+              <button
+                onClick={() => setShowManageDoctorsModal(false)}
+                className="w-full px-4 py-2 border rounded-lg hover:bg-slate-50 text-sm font-medium"
+              >
+                关闭
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* 分配医生模态框 */}
       {showAssignModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
@@ -680,7 +825,8 @@ const HospitalManagement = () => {
               {/* 选择医生 */}
               <div>
                 <label className="text-sm font-medium text-slate-700 block mb-2">
-                  选择医生 *
+                  选择医生 * 
+                  <span className="text-xs text-slate-500 font-normal ml-1">（仅显示未分配医院的医生）</span>
                 </label>
                 <select
                   value={selectedDoctorId}
@@ -697,7 +843,7 @@ const HospitalManagement = () => {
                 </select>
                 {approvedDoctors.length === 0 && (
                   <div className="text-xs text-slate-500 mt-1">
-                    暂无已审核通过的医生
+                    暂无未分配医院的医生
                   </div>
                 )}
               </div>

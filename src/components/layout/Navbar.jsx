@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import api from '../../api/auth';
 import { resolveMediaUrl } from '../../api/utils';
 import { getDoctorAudits } from '../../api/admin';
+import { Smile } from 'lucide-react';
 
 // 顶部导航栏组件
 const Navbar = ({ currentPage, navigateTo }) => {
@@ -187,10 +188,10 @@ const Navbar = ({ currentPage, navigateTo }) => {
         <nav className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-slate-200 shadow-sm">
             <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
                 <div className="flex items-center gap-2 cursor-pointer" onClick={() => navigateTo('')}>
-                    <div className="w-8 h-8 bg-gradient-to-tr from-cyan-500 to-blue-600 rounded-lg flex items-center justify-center text-white font-bold shadow-lg shadow-cyan-500/30">
-                        D
+                    <div className="w-8 h-8 bg-gradient-to-tr from-cyan-500 to-blue-600 rounded-lg flex items-center justify-center text-white shadow-lg shadow-cyan-500/30">
+                        <Smile size={20} />
                     </div>
-                    <span className="font-bold text-lg tracking-tight text-slate-800">未来诊所</span>
+                    <span className="font-bold text-lg tracking-tight text-slate-800">牙科预约管理系统</span>
                 </div>
 
                 <div className="flex-1 flex items-center justify-center">
