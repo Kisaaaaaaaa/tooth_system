@@ -19,10 +19,16 @@ const Navbar = ({ currentPage, navigateTo }) => {
 
     // 医生端菜单
     const doctorPageLabels = {
+        'doctorMySchedule': '我的排班',
         'doctorAppointments': '预约管理',
         'doctorRecords': '病例管理',
         'doctorConsultation': '在线问诊',
         'doctorProfile': '个人信息'
+    };
+    
+    // 管理员医生额外菜单
+    const adminDoctorPageLabels = {
+        'doctorSchedule': '排班管理'
     };
 
     // 管理员菜单（顶部导航快捷入口）
@@ -206,15 +212,29 @@ const Navbar = ({ currentPage, navigateTo }) => {
                                 </button>
                             ))
                             : role === 'doctor' 
-                            ? Object.entries(doctorPageLabels).map(([page, label]) => (
-                                <button
-                                    key={page}
-                                    onClick={() => navigateTo(page)}
-                                    className={`hover:text-cyan-600 transition ${currentPage === page ? 'text-cyan-600 font-bold' : ''}`}
-                                >
-                                    {label}
-                                </button>
-                            ))
+                            ? (
+                                <>
+                                    {Object.entries(doctorPageLabels).map(([page, label]) => (
+                                        <button
+                                            key={page}
+                                            onClick={() => navigateTo(page)}
+                                            className={`hover:text-cyan-600 transition ${currentPage === page ? 'text-cyan-600 font-bold' : ''}`}
+                                        >
+                                            {label}
+                                        </button>
+                                    ))}
+                                    {/* 管理员医生额外显示排班管理 */}
+                                    {user?.is_admin && Object.entries(adminDoctorPageLabels).map(([page, label]) => (
+                                        <button
+                                            key={page}
+                                            onClick={() => navigateTo(page)}
+                                            className={`hover:text-cyan-600 transition ${currentPage === page ? 'text-cyan-600 font-bold' : ''}`}
+                                        >
+                                            {label}
+                                        </button>
+                                    ))}
+                                </>
+                            )
                             : ['home', 'model3d', 'hospitals', 'doctors', 'consultation', 'appointment', 'records', 'aiInquiry'].map(page => (
                                 <button
                                     key={page}

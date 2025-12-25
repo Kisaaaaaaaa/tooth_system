@@ -247,16 +247,48 @@ const Login = ({ navigateTo }) => {
             
             // 使用api.login函数确保使用正确的mock服务器地址
             const res = await api.login(payload);
-            console.log('登录响应:', res);
+            console.log('===== 登录响应完整内容 =====');
+            console.log('res:', JSON.stringify(res, null, 2));
 
             // 业务失败（即使 HTTP 200 也要拦截提示）
             const bizCode = res?.code ?? res?.status ?? res?.data?.code;
+            console.log('bizCode:', bizCode);
+            
+            // 特殊处理：医生审核未通过的情况
+            const errorMsg = res?.message || res?.data?.message || '';
+            if (bizCode && Number(bizCode) >= 400 && errorMsg.includes('审核未通过')) {
+                console.log('检测到医生审核未通过，准备跳转到申请页面');
+                // 提取拒绝原因（格式：审核未通过：原因）
+                const reasonMatch = errorMsg.match(/审核未通过[：:]\s*(.+)/);
+                const reasonMsg = reasonMatch ? reasonMatch[1] : '您的医生申请未通过审核';
+                
+                setError(`${errorMsg}。3秒后将跳转到申请页面重新填写。`);
+                
+                // 延迟跳转到注册页的医生申请步骤
+                setTimeout(() => {
+                    console.log('开始跳转到注册页面');
+                    localStorage.setItem('doctorReapply', 'true');
+                    localStorage.setItem('doctorRejectReason', reasonMsg);
+                    localStorage.setItem('doctorReapplyPhone', phone);
+                    if (typeof navigateTo === 'function') {
+                        console.log('使用 navigateTo 跳转');
+                        navigateTo('register');
+                    } else {
+                        console.log('使用 window.location.href 跳转');
+                        window.location.href = '/register';
+                    }
+                }, 3000);
+                return;
+            }
+            
             if (bizCode && Number(bizCode) >= 400) {
-                const msg = res?.message || res?.data?.message || '登录失败，请检查账号或验证码';
+                const msg = errorMsg || '登录失败，请检查账号或验证码';
+                console.log('检测到业务错误，提前返回');
                 setError(msg);
                 refreshCaptcha();
                 return;
             }
+            console.log('业务码检查通过，继续处理登录');
             
             // 提取 token 和 user 数据
             let token = null;
@@ -349,6 +381,42 @@ const Login = ({ navigateTo }) => {
                 role: localStorage.getItem('role'),
                 authToken: !!localStorage.getItem('authToken')
             });
+            
+            // 检查是否有审核被拒绝的提示
+            const loginNotice = res?.data?.login_notice || '';
+            const rejectedReason = res?.data?.rejected_reason || '';
+            
+            console.log('===== 医生状态检查 =====');
+            console.log('userObj:', userObj);
+            console.log('role:', userObj?.role);
+            console.log('status:', userObj?.status);
+            console.log('rejected_reason:', rejectedReason);
+            
+            // 如果是被拒绝的医生，显示拒绝原因并跳转到申请页面
+            if (userObj && userObj.role === 'doctor' && (userObj.status === 'inactive' || rejectedReason)) {
+                const reasonMsg = rejectedReason || userObj.rejected_reason || '您的医生申请未通过审核';
+                console.log('检测到被拒绝的医生，准备跳转');
+                console.log('拒绝原因:', reasonMsg);
+                setError(`审核未通过：${reasonMsg}。3秒后将跳转到申请页面重新填写。`);
+                
+                // 延迟跳转到注册页的医生申请步骤
+                setTimeout(() => {
+                    console.log('开始跳转到注册页面');
+                    // 先保存当前信息，以便在申请页可以复用
+                    localStorage.setItem('doctorReapply', 'true');
+                    localStorage.setItem('doctorRejectReason', reasonMsg);
+                    if (typeof navigateTo === 'function') {
+                        console.log('使用 navigateTo 跳转');
+                        navigateTo('register');
+                    } else {
+                        console.log('使用 window.location.href 跳转');
+                        window.location.href = '/register';
+                    }
+                }, 3000);
+                return;
+            }
+            
+            console.log('医生状态正常或非医生角色，继续正常登录流程');
             
             // 根据 role 判断跳转页面
             let targetPage = '';

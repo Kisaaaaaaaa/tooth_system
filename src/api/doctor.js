@@ -57,6 +57,8 @@ export async function applyDoctor(payload = {}) {
             name: payload.name,
             title: payload.title,
             specialty: payload.specialty,
+            // 后端匿名申请用于定位账号的必填字段
+            phone: payload.phone,
             ...(payload.hospital_id ? { hospital_id: payload.hospital_id } : {}),
             ...(payload.avatar ? { avatar: payload.avatar } : {}),
             ...(payload.introduction ? { introduction: payload.introduction } : {}),
@@ -66,13 +68,30 @@ export async function applyDoctor(payload = {}) {
         redirect: 'follow'
     });
 
-    const text = await res.text();
-    const data = handleResponse(text);
+    // 统一处理后端的 success_response/error_response
+    const contentType = res.headers.get('content-type') || '';
+    let parsed;
+    if (contentType.includes('application/json')) {
+        parsed = await res.json().catch(() => ({}));
+    } else {
+        const text = await res.text();
+        parsed = handleResponse(text);
+    }
+
+    // 后端即使业务错误也返回 200，通过 code 判断
+    if (parsed && typeof parsed === 'object' && 'code' in parsed) {
+        if (parsed.code !== 200) {
+            const msg = parsed.message || '提交医生申请失败';
+            throw new Error(msg);
+        }
+        return parsed.data ?? parsed;
+    }
+
     if (!res.ok) {
-        const msg = (data && (data.message || data.detail)) || `HTTP ${res.status}`;
+        const msg = (parsed && (parsed.message || parsed.detail)) || `HTTP ${res.status}`;
         throw new Error(typeof msg === 'string' ? msg : JSON.stringify(msg));
     }
-    return data;
+    return parsed;
 }
 
 /**
@@ -196,6 +215,40 @@ export async function getDoctorMe() {
     } catch (error) {
         console.error('获取医生自己的详情失败:', error);
         throw error;
+    }
+}
+
+// 获取医生排班列表
+// params: { hospital_id, doctor_id, start, end, status }
+export async function getSchedules(params = {}) {
+    const token = localStorage.getItem('access_token') || localStorage.getItem('authToken');
+    const headers = {
+        'Accept': 'application/json',
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+    };
+
+    const query = new URLSearchParams();
+    if (params.hospital_id) query.append('hospital_id', params.hospital_id);
+    if (params.doctor_id) query.append('doctor_id', params.doctor_id);
+    if (params.start) query.append('start', params.start);
+    if (params.end) query.append('end', params.end);
+    if (params.status) query.append('status', params.status);
+
+    const res = await fetch(`${API_BASE}/doctors/schedules/${query.toString() ? `?${query.toString()}` : ''}`, {
+        method: 'GET',
+        headers,
+        redirect: 'follow'
+    });
+
+    const contentType = res.headers.get('content-type') || '';
+    if (contentType.includes('application/json')) {
+        return res.json();
+    }
+    const text = await res.text();
+    try {
+        return JSON.parse(text);
+    } catch {
+        return { message: text, status: res.status };
     }
 }
 
@@ -446,5 +499,6 @@ export default {
     completeAppointment,
     createRecord,
     updateRecord,
-    getPatientRecords
+    getPatientRecords,
+    getSchedules
 };

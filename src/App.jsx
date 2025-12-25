@@ -24,7 +24,9 @@ import DoctorDashboard from './components/doctor/DoctorDashboard';
 import DoctorAppointments from './components/doctor/DoctorAppointments';
 import DoctorRecords from './components/doctor/DoctorRecords';
 import DoctorConsultation from './components/doctor/DoctorConsultation';
+import DoctorMySchedule from './components/doctor/DoctorMySchedule';
 import DoctorProfile from './components/doctor/DoctorProfile';
+import DoctorSchedule from './components/doctor/DoctorSchedule';
 import './styles/global.css';
 
 // 路由包装组件，用于传递导航函数
@@ -135,9 +137,19 @@ const AppWithRouter = () => {
                         <DoctorConsultation />
                     </div>
                 } />
+                <Route path="/doctorMySchedule" element={
+                    <div className="max-w-7xl mx-auto px-4 md:px-6">
+                        <DoctorMySchedule />
+                    </div>
+                } />
                 <Route path="/doctorProfile" element={
                     <div className="max-w-7xl mx-auto px-4 md:px-6">
                         <DoctorProfile />
+                    </div>
+                } />
+                <Route path="/doctorSchedule" element={
+                    <div className="max-w-7xl mx-auto px-4 md:px-6">
+                        <DoctorSchedule />
                     </div>
                 } />
 
