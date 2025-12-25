@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { Send, Loader2, AlertCircle, ArrowLeft, ShieldAlert, RefreshCw } from 'lucide-react';
 import consultationApi from '../../api/consultations';
@@ -35,6 +35,28 @@ const ConsultationPage = ({ currentDoctor, consultationAuthRequired = false }) =
     const [hospitals, setHospitals] = useState([]);
 
     const listRef = useRef(null);
+    const stickToBottomRef = useRef(true);
+
+    const isAtBottom = () => {
+        const el = listRef.current;
+        if (!el) return false;
+        return el.scrollHeight - el.scrollTop - el.clientHeight < 20;
+    };
+
+    const scrollToBottom = () => {
+        const el = listRef.current;
+        if (!el) return;
+        el.scrollTop = el.scrollHeight;
+    };
+
+    useLayoutEffect(() => {
+        const el = listRef.current;
+        if (!el) return;
+
+        if (stickToBottomRef.current) {
+            el.scrollTop = el.scrollHeight;
+        }
+    }, [messages]);
 
     // 医生切换时重置会话与消息
     useEffect(() => {
@@ -44,12 +66,7 @@ const ConsultationPage = ({ currentDoctor, consultationAuthRequired = false }) =
         setInput('');
     }, [doctorId]);
 
-    // 滚动到底部
-    useEffect(() => {
-        if (listRef.current) {
-            listRef.current.scrollTop = listRef.current.scrollHeight;
-        }
-    }, [messages]);
+
 
     // 如果外部传入 doctor 发生变化，更新本地 doctor
     useEffect(() => {
@@ -77,40 +94,7 @@ const ConsultationPage = ({ currentDoctor, consultationAuthRequired = false }) =
         loadDoctor();
     }, [doctorId, doctor]);
 
-    // // 当医生信息更新时，检查是否需要添加到侧边栏聊天记录
-    // useEffect(() => {
-    //     if (!doctor) return;
 
-    //     // 检查该医生是否已在聊天记录中
-    //     const isDoctorInHistory = consultationHistories.some(
-    //         history => history.doctor_id === doctor.id
-    //     );
-
-    //     if (!isDoctorInHistory) {
-    //         // 创建新的聊天记录项
-    //         const newHistory = {
-    //             consultation_id: Date.now(),
-    //             doctor_id: doctor.id,
-    //             doctor_name: doctor.name,
-    //             doctor_avatar: doctor.avatar,
-    //             doctor_title: doctor.title,
-    //             doctor_hospital: hospitals.find(hospital => hospital.id === doctor.hospital_id)?.name || '未知医院',
-    //             last_message: '',
-    //             last_time: '',
-    //             unread: 0,
-    //             messages: [],
-    //             last_active_time: Date.now() // 设置当前时间为活动时间
-    //         };
-
-    //         // 添加到侧边栏聊天记录并保持排序
-    //         setConsultationHistories(prev => {
-    //             const updated = [...prev, newHistory];
-    //             // 按活动时间降序排序
-    //             updated.sort((a, b) => b.last_active_time - a.last_active_time);
-    //             return updated;
-    //         });
-    //     }
-    // }, [doctor, consultationHistories]);
 
     // 加载医院数据
     useEffect(() => {
@@ -130,31 +114,6 @@ const ConsultationPage = ({ currentDoctor, consultationAuthRequired = false }) =
         loadHospitals();
     }, []);
 
-    // // 加载会诊历史记录
-    // useEffect(() => {
-    //     const loadConsultationHistories = async () => {
-    //         try {
-    //             const resp = await consultationApi.ListConsultations();
-    //             const histories = resp.data?.results || [];
-
-    //             // 为每个历史记录添加last_active_time字段用于排序
-    //             const sortedHistories = histories.map(item => ({
-    //                 ...item,
-    //                 last_active_time: Date.now() - Math.random() * 1000000 // 暂时使用随机值，实际应该从API获取
-    //             }));
-
-    //             // 按活动时间降序排序
-    //             sortedHistories.sort((a, b) => b.last_active_time - a.last_active_time);
-
-    //             setConsultationHistories(sortedHistories);
-    //         } catch (err) {
-    //             console.error('加载会诊历史记录失败:', err);
-    //             setConsultationHistories([]);
-    //         }
-    //     };
-
-    //     loadConsultationHistories();
-    // }, []);
     useEffect(() => {
         const loadConsultationHistories = async () => {
             try {
@@ -168,7 +127,7 @@ const ConsultationPage = ({ currentDoctor, consultationAuthRequired = false }) =
                             const detail = await consultationApi.GetConsultationDetail(c.id);
                             const msgs = detail.data?.messages?.results || [];
 
-                            // ⭐ 核心过滤条件
+                            //  核心过滤条件
                             if (msgs.length === 0) return null;
 
                             const dResp = await doctorsApi.getDoctorDetail(c.doctor_id);
@@ -197,7 +156,7 @@ const ConsultationPage = ({ currentDoctor, consultationAuthRequired = false }) =
 
         loadConsultationHistories();
     }, []);
-    // ⭐ 自动续聊：如果已存在与该医生的会诊，自动打开
+    //  自动续聊：如果已存在与该医生的会诊，自动打开
     useEffect(() => {
         if (!doctorId || consultationHistories.length === 0) return;
 
@@ -223,13 +182,11 @@ const ConsultationPage = ({ currentDoctor, consultationAuthRequired = false }) =
                 setError('当前问诊需登录后使用，请先登录。');
                 return;
             }
-            // await ensureSessionAndMessages();
             if (consultationId) {
                 await fetchMessages(consultationId);
             }
         };
         bootstrap();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [doctorId, consultationAuthRequired]);
 
     const ensureSessionAndMessages = async () => {
@@ -281,6 +238,7 @@ const ConsultationPage = ({ currentDoctor, consultationAuthRequired = false }) =
 
     const handleSend = async () => {
         const content = input.trim();
+        const shouldStickBottom = isAtBottom();
         if (!content) return;
         if (consultationAuthRequired && !isAuthed()) {
             setError('发送前请先登录。');
@@ -305,6 +263,8 @@ const ConsultationPage = ({ currentDoctor, consultationAuthRequired = false }) =
             const tempMessage = { id: `temp-${Date.now()}`, sender: 'user', text: content, time: formatNow(), pending: true };
             setMessages((prev) => [...prev, tempMessage]);
             setInput('');
+
+            stickToBottomRef.current = shouldStickBottom;
             //先保证左侧存在这条会诊
             setConsultationHistories(prev => {
                 const exists = prev?.some(
@@ -436,31 +396,7 @@ const ConsultationPage = ({ currentDoctor, consultationAuthRequired = false }) =
                             return (
                                 <div
                                     key={history.id || history.consultation_id}
-                                    // onClick={async () => {
-                                    //     try {
 
-                                    //         const resp = await doctorsApi.getDoctorDetail(history.doctor_id);
-                                    //         const doctorData = resp.data || resp;
-
-                                    //         setDoctor(doctorData);
-                                    //         setConsultationId(history.id || history.consultation_id || null);
-                                    //         setMessages([]); // 由后续 fetchMessages 拉取
-
-
-                                    //         const now = Date.now();
-                                    //         setConsultationHistories(prev => {
-                                    //             const updated = prev.map(item =>
-                                    //                 item.doctor_id === history.doctor_id
-                                    //                     ? { ...item, unread: 0, last_active_time: now + 1000000000 }
-                                    //                     : item
-                                    //             );
-                                    //             updated.sort((a, b) => b.last_active_time - a.last_active_time);
-                                    //             return updated;
-                                    //         });
-                                    //     } catch (e) {
-                                    //         console.error('切换医生失败', e);
-                                    //     }
-                                    // }}
                                     onClick={async () => {
                                         try {
                                             setConsultationId(history.id);
@@ -591,7 +527,7 @@ const ConsultationPage = ({ currentDoctor, consultationAuthRequired = false }) =
         const groupedMessages = groupMessagesByTime();
 
         return (
-            <div ref={listRef} className="flex-1 overflow-y-auto p-4 bg-slate-50 space-y-6">
+            <div className="flex-1 overflow-y-auto p-4 bg-slate-50 space-y-6">
                 {groupedMessages.map((group, groupIndex) => (
                     <div key={groupIndex} className="space-y-3">
                         {/* 时间分隔 */}
@@ -677,8 +613,7 @@ const ConsultationPage = ({ currentDoctor, consultationAuthRequired = false }) =
                         ref={listRef}
                         className="flex-1 overflow-y-auto bg-slate-50"
                         style={{
-                            scrollBehavior: 'smooth',
-                            overflowAnchor: 'auto'
+                            overflowAnchor: 'none'
                         }}
                     >
                         {loading ? (

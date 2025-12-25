@@ -18,6 +18,24 @@ const DoctorsPage = ({ navigateTo, startConsultation, startAppointment }) => {
     // 医院映射（id -> name），用于展示接口返回的 hospital_id
     const [hospitalsMap, setHospitalsMap] = useState({});
 
+    // 离线问诊拦截弹窗
+    const [offlineTipOpen, setOfflineTipOpen] = useState(false);
+    const [offlineTipText, setOfflineTipText] = useState('');
+
+    const isDoctorOnline = (doctor) => {
+        const v = doctor?.is_online ?? doctor?.isOnline ?? doctor?.online;
+        return Boolean(v);
+    };
+
+    const handleStartConsultation = (doctor) => {
+        if (!isDoctorOnline(doctor)) {
+            setOfflineTipText('医生不在线，暂不能问诊');
+            setOfflineTipOpen(true);
+            return;
+        }
+        startConsultation && startConsultation(doctor);
+    };
+
     // 加载医生列表（优先接口，失败回退 mock）
     useEffect(() => {
         const fetchDoctors = async () => {
@@ -122,6 +140,25 @@ const DoctorsPage = ({ navigateTo, startConsultation, startAppointment }) => {
                                         <div>
                                             <h3 className="text-xl font-bold text-slate-800 transition-colors duration-300 hover:text-cyan-700">{doc.name}</h3>
                                             <p className="text-sm text-cyan-600 font-medium mt-0.5">{doc.title}</p>
+                                            <div className="mt-1">
+                                                {(() => {
+                                                    const isOnline = doc?.is_online ?? doc?.isOnline ?? doc?.online;
+                                                    const online = Boolean(isOnline);
+                                                    return (
+                                                        <span className={
+                                                            `inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border text-xs ` +
+                                                            (online
+                                                                ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                                                : 'bg-slate-50 text-slate-600 border-slate-200')
+                                                        }>
+                                                            <span className={
+                                                                `w-2 h-2 rounded-full ` + (online ? 'bg-emerald-500' : 'bg-slate-400')
+                                                            } />
+                                                            {online ? '在线' : '离线'}
+                                                        </span>
+                                                    );
+                                                })()}
+                                            </div>
                                             <p className="text-xs text-slate-600 mt-1">专长：{doc.specialty}</p>
                                             <p className="text-xs text-slate-500 mt-1 flex items-center gap-1">
                                                 <span className="w-1.5 h-1.5 rounded-full bg-cyan-500"></span>
@@ -137,7 +174,10 @@ const DoctorsPage = ({ navigateTo, startConsultation, startAppointment }) => {
                                     {/* 操作按钮 */}
                                     <div className="flex gap-2 mt-5">
                                         <button
-                                            onClick={(e) => { e.stopPropagation(); startConsultation && startConsultation(doc); }}
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                handleStartConsultation(doc);
+                                            }}
                                             className="flex-1 py-2 bg-gradient-to-r from-blue-50 to-blue-100 text-blue-700 text-sm font-medium rounded-lg hover:from-blue-100 hover:to-blue-200 transition-all duration-300 flex items-center justify-center gap-1.5 shadow-sm hover:shadow-md"
                                         >
                                             <MessageSquare size={16} />
@@ -164,6 +204,24 @@ const DoctorsPage = ({ navigateTo, startConsultation, startAppointment }) => {
                     <Search size={48} className="mx-auto text-slate-300 mb-4" />
                     <h3 className="text-xl font-semibold text-slate-700 mb-2">未找到相关医生</h3>
                     <p className="text-slate-500">请尝试使用其他关键词搜索</p>
+                </div>
+            )}
+
+            {/* 离线提示弹窗 */}
+            {offlineTipOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
+                    <div className="bg-white rounded-lg shadow-lg p-6 w-80">
+                        <h3 className="text-lg font-bold mb-2 text-slate-800">提示</h3>
+                        <div className="mb-4 text-sm text-slate-700">{offlineTipText}</div>
+                        <div className="flex justify-end">
+                            <button
+                                onClick={() => setOfflineTipOpen(false)}
+                                className="px-4 py-1 bg-cyan-600 text-white rounded text-sm"
+                            >
+                                知道了
+                            </button>
+                        </div>
+                    </div>
                 </div>
             )}
         </div>

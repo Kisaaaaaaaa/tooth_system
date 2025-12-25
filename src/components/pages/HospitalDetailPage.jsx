@@ -91,6 +91,24 @@ const HospitalDetailPage = ({ navigateTo, hospitalId, startConsultation, startAp
     const [doctorDetailLoading, setDoctorDetailLoading] = useState(false);
     const [doctorDetailError, setDoctorDetailError] = useState(null);
 
+    // 离线问诊拦截弹窗
+    const [offlineTipOpen, setOfflineTipOpen] = useState(false);
+    const [offlineTipText, setOfflineTipText] = useState('');
+
+    const isDoctorOnline = (doctor) => {
+        const v = doctor?.is_online ?? doctor?.isOnline ?? doctor?.online;
+        return Boolean(v);
+    };
+
+    const handleStartConsultation = (doctor) => {
+        if (!isDoctorOnline(doctor)) {
+            setOfflineTipText('医生不在线，暂不能问诊');
+            setOfflineTipOpen(true);
+            return;
+        }
+        startConsultation && startConsultation(doctor);
+    };
+
     // 按评分排序的医生排行榜
     const sortedDoctors = [...doctors].sort((a, b) => b.score - a.score);
 
@@ -263,7 +281,11 @@ const HospitalDetailPage = ({ navigateTo, hospitalId, startConsultation, startAp
                                         </button>
                                         <button
                                             className="flex-1 py-2.5 bg-gradient-to-r from-slate-600 to-slate-700 text-white rounded-lg text-sm font-medium hover:from-slate-700 hover:to-slate-800 transition-all shadow-md hover:shadow-lg"
-                                            onClick={() => startConsultation && startConsultation(doctor)}
+                                            onClick={(e) => {
+                                                e.preventDefault();
+                                                e.stopPropagation();
+                                                handleStartConsultation(doctor);
+                                            }}
                                         >
                                             在线咨询
                                         </button>
@@ -376,6 +398,24 @@ const HospitalDetailPage = ({ navigateTo, hospitalId, startConsultation, startAp
                     </div>
                 </div>
             </div>
+
+            {/* 离线提示弹窗 */}
+            {offlineTipOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
+                    <div className="bg-white rounded-lg shadow-lg p-6 w-80">
+                        <h3 className="text-lg font-bold mb-2 text-slate-800">提示</h3>
+                        <div className="mb-4 text-sm text-slate-700">{offlineTipText}</div>
+                        <div className="flex justify-end">
+                            <button
+                                onClick={() => setOfflineTipOpen(false)}
+                                className="px-4 py-1 bg-cyan-600 text-white rounded text-sm"
+                            >
+                                知道了
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
