@@ -7,8 +7,9 @@ const HomePage = ({ navigateTo }) => {
     // 统计数据状态
     const [statistics, setStatistics] = useState({
         cooperation_clinics: 2000,
-        appointment_efficiency: 98,
-        revenue_growth: 45,
+        // 兼容旧字段：appointment_efficiency / revenue_growth
+        appointment_completion_rate: 98,
+        appointment_growth_rate: 45,
         patient_satisfaction: 95,
         today_patients: 128,
         online_doctors: 12
@@ -28,6 +29,22 @@ const HomePage = ({ navigateTo }) => {
 
         // 兜底：防止异常值撑爆 UI
         return Math.round(Math.max(0, Math.min(100, n)));
+    };
+
+    const getAppointmentCompletionRate = () => {
+        const v =
+            statistics?.appointment_completion_rate ??
+            // 旧字段：之前前端把它当成百分比使用
+            statistics?.appointment_efficiency;
+        return toPercent(v);
+    };
+
+    const getAppointmentGrowthRate = () => {
+        const v =
+            statistics?.appointment_growth_rate ??
+            // 旧字段：之前前端把它当成百分比使用
+            statistics?.revenue_growth;
+        return toPercent(v);
     };
 
     // 获取统计数据
@@ -101,9 +118,7 @@ const HomePage = ({ navigateTo }) => {
                                     <Building className="text-blue-500" size={28} />
                                 </div>
                                 <div className="text-4xl font-bold text-slate-800 mb-2">
-                                    {statistics.cooperation_clinics >= 1000
-                                        ? `${(statistics.cooperation_clinics / 1000).toFixed(0)}K+`
-                                        : `${statistics.cooperation_clinics}+`}
+                                    {statistics.cooperation_clinics}
                                 </div>
                                 <div className="font-medium text-slate-700 text-lg">合作诊所</div>
                                 <div className="text-sm text-slate-500 mt-2">全国超过{statistics.cooperation_clinics}家牙科诊所的选择</div>
@@ -113,18 +128,18 @@ const HomePage = ({ navigateTo }) => {
                                 <div className="p-4 rounded-xl bg-green-50 mb-4">
                                     <Clock className="text-green-500" size={28} />
                                 </div>
-                                <div className="text-4xl font-bold text-slate-800 mb-2">{statistics.appointment_efficiency}%</div>
-                                <div className="font-medium text-slate-700 text-lg">预约效率提升</div>
-                                <div className="text-sm text-slate-500 mt-2">平均预约处理时间缩短{statistics.appointment_efficiency}%</div>
+                                <div className="text-4xl font-bold text-slate-800 mb-2">{getAppointmentCompletionRate()}%</div>
+                                <div className="font-medium text-slate-700 text-lg">预约完成率</div>
+                                <div className="text-sm text-slate-500 mt-2">今日预约完成率达{getAppointmentCompletionRate()}%</div>
                             </div>
 
                             <div className="bg-white rounded-xl p-6 shadow-sm border-t-4 border-amber-500 hover:shadow-md transition-shadow flex flex-col items-center text-center">
                                 <div className="p-4 rounded-xl bg-amber-50 mb-4">
                                     <TrendingUp className="text-amber-500" size={28} />
                                 </div>
-                                <div className="text-4xl font-bold text-slate-800 mb-2">{statistics.revenue_growth}%</div>
-                                <div className="font-medium text-slate-700 text-lg">收入增长</div>
-                                <div className="text-sm text-slate-500 mt-2">诊所平均收入增长{statistics.revenue_growth}%</div>
+                                <div className="text-4xl font-bold text-slate-800 mb-2">{getAppointmentGrowthRate()}%</div>
+                                <div className="font-medium text-slate-700 text-lg">预约增长率</div>
+                                <div className="text-sm text-slate-500 mt-2">近30天预约增长{getAppointmentGrowthRate()}%</div>
                             </div>
 
                             {/* 第二行：3个指标 */}

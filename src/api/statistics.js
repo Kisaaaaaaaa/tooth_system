@@ -1,8 +1,10 @@
 // API wrapper for statistics endpoints
 // Each function returns parsed JSON when possible, or raw text otherwise.
 
-// 使用后端 API 地址
-const API_BASE = 'http://localhost:8000/api'; // root; change if backend is mounted under a prefix
+// 统计模块 API 基地址：
+// - 开发环境建议使用相对路径走 Vite proxy（避免跨域/端口差异导致的连接问题）
+// - 需要时可通过环境变量覆盖（Vite: VITE_API_BASE）
+const API_BASE = (import.meta?.env?.VITE_API_BASE || '/api').replace(/\/$/, '');
 
 function handleResponse(res) {
   const ct = res.headers.get('content-type') || '';
@@ -70,29 +72,29 @@ function handleResponse(res) {
  * }
  */
 export async function getHomeStatistics() {
-    try {
-        const requestOptions = {
-            method: 'GET',
-            redirect: 'follow'
-        };
-        const res = await fetch(`${API_BASE}/statistics/home/`, requestOptions);
-        return handleResponse(res);
-    } catch (error) {
-        console.error('获取首页统计数据失败:', error);
-        // 如果mock服务器无法响应，返回默认数据
-        return {
-            code: 200,
-            message: "使用默认统计数据",
-            data: {
-                cooperation_clinics: 2000,
-                appointment_efficiency: 98,
-                revenue_growth: 45,
-                patient_satisfaction: 95,
-                today_patients: 128,
-                online_doctors: 12
-            }
-        };
-    }
+  try {
+    const requestOptions = {
+      method: 'GET',
+      redirect: 'follow'
+    };
+    const res = await fetch(`${API_BASE}/statistics/home/`, requestOptions);
+    return handleResponse(res);
+  } catch (error) {
+    console.error('获取首页统计数据失败:', error);
+    // 如果mock服务器无法响应，返回默认数据
+    return {
+      code: 200,
+      message: "使用默认统计数据",
+      data: {
+        cooperation_clinics: 2000,
+        appointment_efficiency: 98,
+        revenue_growth: 45,
+        patient_satisfaction: 95,
+        today_patients: 128,
+        online_doctors: 12
+      }
+    };
+  }
 }
 
 export default {
