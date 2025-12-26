@@ -606,8 +606,8 @@ const HospitalManagement = () => {
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 {filteredHospitals.map(h => (
-                  <div key={h.id} className="border rounded-lg p-3 hover:shadow-md transition-shadow bg-white">
-                    <div className="flex gap-3">
+                  <div key={h.id} className="border rounded-lg p-3 hover:shadow-md transition-shadow bg-white flex flex-col">
+                    <div className="flex gap-3 flex-grow">
                       {/* 图片 */}
                       {h.image && (
                         <div className="flex-shrink-0">
