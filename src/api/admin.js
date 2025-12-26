@@ -487,13 +487,29 @@ export async function unblacklistUser(userId) {
     return handleResponse(res);
 }
 
-export async function autoBlacklistUsers() {
+/**
+ * 批量拉黑未按时签到超过阈值的用户
+ * @param {number} threshold - 未按时签到次数阈值，默认5
+ */
+export async function autoBlacklistUsers(threshold = 5) {
+    const myHeaders = new Headers();
+    myHeaders.append('Accept', 'application/json');
+    myHeaders.append('Content-Type', 'application/json');
+    const token = localStorage.getItem('access_token') || localStorage.getItem('authToken');
+    if (token) {
+        myHeaders.append('Authorization', `Bearer ${token}`);
+    }
+
     const requestOptions = {
         method: 'POST',
-        headers: getAuthHeaders(),
+        headers: myHeaders,
+        body: JSON.stringify({ threshold }),
         redirect: 'follow'
     };
-    const res = await fetch(`${API_BASE}/admin/users/auto-blacklist`, requestOptions);
+    
+    const url = `${API_BASE}/auth/admin/users/blacklist-by-noshow/`;
+    console.log('[autoBlacklistUsers] 请求URL:', url, '阈值:', threshold);
+    const res = await fetch(url, requestOptions);
     return handleResponse(res);
 }
 
