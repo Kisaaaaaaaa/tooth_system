@@ -2,7 +2,8 @@ import React, { useEffect, useState } from 'react';
 import api from '../../api/auth';
 import { resolveMediaUrl } from '../../api/utils';
 import { getDoctorAudits } from '../../api/admin';
-import { Smile } from 'lucide-react';
+import { Smile, HelpCircle } from 'lucide-react';
+import GuideModal from '../common/GuideModal';
 
 // 顶部导航栏组件
 const Navbar = ({ currentPage, navigateTo }) => {
@@ -43,6 +44,7 @@ const Navbar = ({ currentPage, navigateTo }) => {
     const [user, setUser] = useState(null);
     const [role, setRole] = useState(null);
     const [pendingDoctorsCount, setPendingDoctorsCount] = useState(0);
+    const [showGuide, setShowGuide] = useState(false);
 
     // 检查登录状态
     const checkLoginStatus = () => {
@@ -109,6 +111,15 @@ const Navbar = ({ currentPage, navigateTo }) => {
         // 组件挂载时检查登录状态
         console.log('[Navbar] 组件挂载，首次检查登录状态');
         checkLoginStatus();
+        // 首次访问自动弹出新手指南（仅一次）
+        try {
+            const seen = localStorage.getItem('onboarding_seen_v1');
+            if (!seen) {
+                setTimeout(() => setShowGuide(true), 300);
+            }
+        } catch (e) {
+            // ignore storage errors
+        }
 
         const onStorage = (e) => {
             console.log('[Navbar] 检测到 storage/localStorageUpdated 事件:', e.type, e.key);
@@ -185,6 +196,7 @@ const Navbar = ({ currentPage, navigateTo }) => {
     };
 
     return (
+        <>
         <nav className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-slate-200 shadow-sm">
             <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
                 <div className="flex items-center gap-2 cursor-pointer" onClick={() => navigateTo('')}>
@@ -252,6 +264,14 @@ const Navbar = ({ currentPage, navigateTo }) => {
                 <div className="flex items-center gap-4">
                     {/* 按钮在所有屏幕显示，登录状态以 authToken 或 user 判断 */}
                     <div className="flex items-center gap-3">
+                        {/* 使用指南入口 */}
+                        <button
+                            onClick={() => setShowGuide(true)}
+                            className="hidden md:inline-flex items-center gap-1.5 text-sm px-3 py-1 rounded border border-slate-200 hover:bg-slate-50 transition text-slate-700"
+                            title="使用指南"
+                        >
+                            <HelpCircle size={16} /> 使用指南
+                        </button>
 
 
                         { /* 修复登录状态判断，确保能正确检测到登录状态 */}
@@ -309,6 +329,17 @@ const Navbar = ({ currentPage, navigateTo }) => {
                 </div>
             </div>
         </nav>
+        {/* 新手指南弹窗 */}
+        <GuideModal
+            open={showGuide}
+            onClose={() => setShowGuide(false)}
+            role={role || 'user'}
+            onNavigate={(page) => {
+                setShowGuide(false);
+                navigateTo(page);
+            }}
+        />
+        </>
     );
 };
 
