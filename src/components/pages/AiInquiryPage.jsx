@@ -573,10 +573,6 @@ const AiInquiryPage = () => {
               </div>
 
               <div className="flex items-center gap-2 flex-shrink-0">
-                <label className="h-[52px] inline-flex items-center justify-center px-3 bg-white border border-slate-200 rounded-2xl text-sm cursor-pointer text-slate-700 hover:bg-slate-50">
-                  上传
-                  <input ref={fileInputRef} onChange={onFileChange} type="file" multiple className="hidden" />
-                </label>
                 <button
                   type="submit"
                   disabled={loading}
