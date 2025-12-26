@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Star, Clock } from 'lucide-react';
+import { ArrowLeft, Star, Clock, Navigation } from 'lucide-react';
 import hospitalsApi from '../../api/hospitals';
 import doctorsApi from '../../api/doctors';
 import { MOCK_HOSPITALS, MOCK_DOCTORS } from '../../data/mockData';
+import RoutePlannerModal from '../navigation/RoutePlannerModal';
+import { getAMapLocation } from '../../api/amapLocation';
 
 const HospitalDetailPage = ({ navigateTo, hospitalId, startConsultation, startAppointment }) => {
     const { hospitalId: hospitalIdFromRoute } = useParams();
@@ -16,10 +18,65 @@ const HospitalDetailPage = ({ navigateTo, hospitalId, startConsultation, startAp
     const [error, setError] = useState(null);
     const [doctorsError, setDoctorsError] = useState(null);
 
+    // 路线规划弹窗状态（复用 HospitalsPage）
+    const [routeModalOpen, setRouteModalOpen] = useState(false);
+    const [routeHospital, setRouteHospital] = useState(null);
+    const [routeLoading, setRouteLoading] = useState(false);
+    const [routeError, setRouteError] = useState(null);
+    const [routeResult, setRouteResult] = useState(null);
+    const [latitude, setLatitude] = useState(null);
+    const [longitude, setLongitude] = useState(null);
+    const [locationAccuracy, setLocationAccuracy] = useState(null);
+
     // 兼容后端字段差异（避免 name/image 为空导致标题/图片不显示）
     const hospitalName = hospital?.name || '医院详情';
     const hospitalImage = hospital?.image || null;
     const hospitalDesc = hospital?.description || hospital?.introduction || '';
+
+    const fetchGeolocationOnce = () => {
+        return getAMapLocation().then((loc) => {
+            setLatitude(loc.latitude);
+            setLongitude(loc.longitude);
+            setLocationAccuracy(loc.accuracy ?? null);
+            return { latitude: loc.latitude, longitude: loc.longitude };
+        });
+    };
+
+    const openRoutePlanner = async (targetHospital) => {
+        if (!targetHospital?.id) return;
+        setRouteHospital(targetHospital);
+        setRouteModalOpen(true);
+        setRouteLoading(true);
+        setRouteError(null);
+        setRouteResult(null);
+
+        try {
+            const token = localStorage.getItem('access_token') || localStorage.getItem('authToken');
+            if (!token) {
+                throw new Error('未检测到登录信息，请先登录后再进行路线规划');
+            }
+
+            // 优先复用已获取的定位；没有则临时获取一次
+            let loc = null;
+            if (latitude != null && longitude != null) {
+                loc = { latitude, longitude };
+            } else {
+                try {
+                    loc = await fetchGeolocationOnce();
+                } catch {
+                    loc = null;
+                }
+            }
+
+            const res = await hospitalsApi.postHospitalRoute(targetHospital.id, loc || {});
+            setRouteResult(res?.data ?? res);
+        } catch (e) {
+            console.error('路线规划请求失败:', e);
+            setRouteError(e?.message || '路线规划请求失败');
+        } finally {
+            setRouteLoading(false);
+        }
+    };
 
     // 获取医院详情
     useEffect(() => {
@@ -189,6 +246,18 @@ const HospitalDetailPage = ({ navigateTo, hospitalId, startConsultation, startAp
     }
     return (
         <div className="space-y-8">
+            {/* 路线规划弹窗 */}
+            <RoutePlannerModal
+                open={routeModalOpen}
+                onClose={() => setRouteModalOpen(false)}
+                hospital={routeHospital}
+                userLocation={latitude != null && longitude != null ? { latitude, longitude, accuracy: locationAccuracy } : null}
+                routeResult={routeResult}
+                loading={routeLoading}
+                error={routeError}
+                onRetry={() => routeHospital && openRoutePlanner(routeHospital)}
+            />
+
             {/* 顶部返回按钮 */}
             <button
                 onClick={() => navigateTo('hospitals')}
@@ -212,7 +281,16 @@ const HospitalDetailPage = ({ navigateTo, hospitalId, startConsultation, startAp
                         }}
                     />
                     <div className="flex-1">
-                        <h1 className="text-2xl font-bold mb-4 text-cyan-700">{hospitalName}</h1>
+                        <div className="flex items-center justify-between gap-3 mb-4">
+                            <h1 className="text-2xl font-bold text-cyan-700 truncate">{hospitalName}</h1>
+                            <button
+                                className="text-cyan-500 hover:text-cyan-600 transition-colors flex-shrink-0"
+                                title="导航"
+                                onClick={() => openRoutePlanner(hospital)}
+                            >
+                                <Navigation size={18} />
+                            </button>
+                        </div>
                         <div className="space-y-3 mb-6">
                             <p className="flex items-center gap-2"><span className="text-slate-600">医院电话:</span> <span className="font-medium">{hospital.phone}</span></p>
                             <p className="flex items-center gap-2"><span className="text-slate-600">地址:</span> <span className="font-medium">{hospital.address}</span></p>
