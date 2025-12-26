@@ -190,7 +190,16 @@ const HospitalsPage = ({ navigateTo }) => {
                         </div>
                         <div className="p-4 flex flex-col gap-3">
                             <div>
-                                <h3 className="font-bold text-lg text-slate-800">{hospital.name}</h3>
+                                <div className="flex items-center justify-between gap-2">
+                                    <h3 className="font-bold text-lg text-slate-800 truncate">{hospital.name}</h3>
+                                    <button
+                                        className="text-cyan-500 hover:text-cyan-600 transition-colors flex-shrink-0"
+                                        title="查看地图位置"
+                                        onClick={() => openRoutePlanner(hospital)}
+                                    >
+                                        <Navigation size={16} />
+                                    </button>
+                                </div>
                             </div>
 
                             {/* 医院电话 */}
@@ -205,13 +214,6 @@ const HospitalsPage = ({ navigateTo }) => {
                                     <MapPin size={14} />
                                     <span className="flex-1 truncate">{hospital.address}</span>
                                 </div>
-                                <button
-                                    className="text-cyan-500 hover:text-cyan-600 transition-colors"
-                                    title="查看地图位置"
-                                    onClick={() => openRoutePlanner(hospital)}
-                                >
-                                    <Navigation size={16} />
-                                </button>
                             </div>
 
                             {/* 查看详情按钮 */}
