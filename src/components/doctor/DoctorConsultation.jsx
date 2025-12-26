@@ -327,12 +327,13 @@ const DoctorConsultation = () => {
 
     // 按时间分组消息
     const groupMessagesByTime = () => {
-        if (!messages.length) return [];
+        if (!messages || !messages.length) return [];
 
         const grouped = [];
-        let currentGroup = { messages: [], time: formatMessageTime(messages[0].created_at || messages[0].time) };
+        let currentGroup = { messages: [], time: formatMessageTime(messages[0]?.created_at || messages[0]?.time) };
 
         messages.forEach((msg, index) => {
+            if (!msg) return; // 跳过空消息
             const msgTime = formatMessageTime(msg.created_at || msg.time);
 
             // 如果是第一条消息，或者时间间隔超过一定阈值，则创建新分组
