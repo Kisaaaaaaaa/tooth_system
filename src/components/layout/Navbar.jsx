@@ -304,7 +304,7 @@ const Navbar = ({ currentPage, navigateTo }) => {
                                 if (role === 'admin') {
                                     navigateTo('admin'); // 管理员点击头像直接跳转到管理面板
                                 } else if (role === 'doctor') {
-                                    navigateTo('doctorDashboard'); // 医生点击头像直接跳转到首页
+                                    navigateTo('doctorProfile'); // 医生点击头像跳转到个人信息
                                 } else {
                                     navigateTo('profile');
                                 }
