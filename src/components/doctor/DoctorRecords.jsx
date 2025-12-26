@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Edit2, Trash2, FileText, Save, X, Search, Filter } from 'lucide-react';
 import doctorApi from '../../api/doctor';
+import uploadApi from '../../api/upload';
 
 const DoctorRecords = () => {
     const [records, setRecords] = useState([]);
@@ -191,6 +192,25 @@ const DoctorRecords = () => {
             if (resolved) {
                 setFormData(prev => ({ ...prev, user_id: resolved, patient_name: value }));
             }
+        }
+    };
+
+    // 本地上传检查图片，保存后端返回的URL到 result_image
+    const handleResultImageUpload = async (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        try {
+            setError(null);
+            const res = await uploadApi.uploadFile(file, { purpose: 'records' });
+            const url = res?.url || (typeof res === 'string' ? res : '');
+            if (!url) throw new Error('图片上传失败：未返回URL');
+            setFormData(prev => ({ ...prev, result_image: url }));
+        } catch (err) {
+            console.error('检查图片上传失败:', err);
+            setError(err?.message || '检查图片上传失败');
+        } finally {
+            // 清空文件选择器的值，避免相同文件无法触发 onChange
+            e.target.value = '';
         }
     };
 
@@ -659,15 +679,23 @@ const DoctorRecords = () => {
                             </div>
 
                             <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-1">检查图片URL</label>
-                                <input
-                                    type="text"
-                                    name="result_image"
-                                    value={formData.result_image}
-                                    onChange={handleFormChange}
-                                    placeholder="请输入检查图片URL"
-                                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                />
+                                <label className="block text-sm font-medium text-slate-700 mb-2">检查图片</label>
+                                <div className="flex items-center gap-3">
+                                    <label className="inline-flex items-center justify-center px-3 py-2 border-2 border-dashed border-slate-300 rounded-lg cursor-pointer hover:border-blue-400 hover:bg-blue-50 transition text-sm text-slate-700">
+                                        上传图片
+                                        <input type="file" accept="image/*" onChange={handleResultImageUpload} className="hidden" />
+                                    </label>
+                                    {formData.result_image && (
+                                        <a href={formData.result_image} target="_blank" rel="noreferrer" className="text-cyan-700 hover:underline text-sm truncate max-w-[320px]" title={formData.result_image}>
+                                            {formData.result_image}
+                                        </a>
+                                    )}
+                                </div>
+                                {formData.result_image && (
+                                    <div className="mt-3">
+                                        <img src={formData.result_image} alt="检查图片预览" className="w-48 h-32 object-cover rounded-lg border border-slate-200" onError={(e)=>{ e.currentTarget.style.display='none'; }} />
+                                    </div>
+                                )}
                             </div>
 
                             <div className="flex gap-3 justify-end pt-4 border-t border-slate-200">
