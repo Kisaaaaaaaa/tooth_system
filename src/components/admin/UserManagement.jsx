@@ -22,16 +22,18 @@ const UserManagement = () => {
       const data = await adminApi.getUsers({ status: '', role: 'user', keyword: cleanKeyword });
       const list = Array.isArray(data?.results) ? data.results : (Array.isArray(data) ? data : []);
       // 映射后端返回的字段到前端使用的字段
-      const normalized = list.map(u => ({
-        id: u.id,
-        name: u.name || u.username || u.phone || `用户${u.id}`,
-        phone: u.phone || '',
-        missedSignIns: u.no_show_count ?? 0,  // 后端返回 no_show_count
-        blacklisted: u.status === 'blacklisted',  // 根据 status 判断是否拉黑
-        role: u.role || 'user',
-        registeredAt: u.created_at || '',  // 后端返回 created_at，直接保留字符串格式
-        lastLoginAt: u.updated_at || ''   // 后端返回 updated_at，直接保留字符串格式
-      }));
+      const normalized = list.map(u => {
+        return {
+          id: u.id,
+          name: u.name || u.username || u.phone || `用户${u.id}`,
+          phone: u.phone || '',
+          missedSignIns: u.no_show_count ?? 0,  // 后端返回 no_show_count
+          blacklisted: u.status === 'inactive',  // 后端用 'inactive' 表示拉黑状态
+          role: u.role || 'user',
+          registeredAt: u.created_at || '',  // 后端返回 created_at，直接保留字符串格式
+          lastLoginAt: u.updated_at || ''   // 后端返回 updated_at，直接保留字符串格式
+        };
+      });
       // 兜底前端过滤，确保只展示 role=user
       const filteredUsers = normalized.filter(u => u.role === 'user');
       setAllUsers(filteredUsers);
@@ -68,44 +70,17 @@ const UserManagement = () => {
   // 自动拉黑未按时签到超过5次的用户
   const autoBlacklist = async () => {
     try {
-      const token = localStorage.getItem('access_token') || localStorage.getItem('authToken');
       const threshold = 5;
-
-      const headers = new Headers();
-      headers.append('Accept', 'application/json');
-      headers.append('Content-Type', 'application/json');
-      if (token) {
-        headers.append('Authorization', `Bearer ${token}`);
-      }
-
-      const requestOptions = {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({ threshold }),
-        redirect: 'follow'
-      };
-
-      const url = 'http://127.0.0.1:4523/m1/7500990-7236569-6684919/auth/admin/users/blacklist-by-noshow/';
-      const res = await fetch(url, requestOptions);
-
-      const contentType = res.headers.get('content-type') || '';
-      let result;
-      if (contentType.includes('application/json')) {
-        result = await res.json();
-      } else {
-        const text = await res.text();
-        try { result = JSON.parse(text); } catch { result = { message: text }; }
-      }
-
+      const result = await adminApi.autoBlacklistUsers(threshold);
       console.log('[autoBlacklist] 响应:', result);
 
-      if (!res.ok) {
-        const msg = (result && (result.message || result.detail)) || `${res.status} ${res.statusText}`;
-        throw new Error(msg);
+      // 成功后重新获取用户列表
+      await fetchUsers();
+      
+      // 显示成功消息（如果后端返回了拉黑的用户数）
+      if (result && result.blacklisted_count !== undefined) {
+        alert(`成功拉黑 ${result.blacklisted_count} 个用户`);
       }
-
-      // 成功后：前端本地更新，将未按时签到次数超过阈值的用户标记为黑名单
-      setUsers(prev => prev.map(u => ({ ...u, blacklisted: (u.missedSignIns || 0) > threshold })));
     } catch (err) {
       setError('自动拉黑失败：' + (err.message || '网络错误'));
       console.error('Error auto blacklisting:', err);
