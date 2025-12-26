@@ -237,7 +237,7 @@ function HeroCarousel({ navigateTo }) {
                     </p>
                     <div className="flex flex-wrap gap-4">
                         <button
-                            onClick={() => navigateTo('appointment')}
+                            onClick={() => navigateTo('doctors')}
                             className="bg-cyan-500 hover:bg-cyan-400 text-white px-8 py-3 rounded-full font-medium transition shadow-lg shadow-cyan-500/25 text-lg"
                         >
                             立即预约
