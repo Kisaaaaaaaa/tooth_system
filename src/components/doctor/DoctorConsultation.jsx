@@ -230,19 +230,11 @@ const DoctorConsultation = () => {
 
             // 判断成功：HTTP 200 + 有响应数据即可（不依赖 code 字段）
             if (res && res.data) {
-                // 乐观更新：立即添加到消息列表
-                const newMessage = {
-                    id: Date.now(),
-                    sender: 'doctor',
-                    sender_id: null, // 医生ID
-                    content: input,
-                    text: input,
-                    created_at: new Date().toISOString(),
-                    role: 'doctor'
-                };
-                setMessages([...messages, newMessage]);
+                // 发送成功后，避免本地重复追加，改为立即拉取最新消息（服务端权威）
+                const sentText = input;
                 setInput('');
-                console.log('消息发送成功');
+                await fetchSessionDetail(selectedSession.id, { merge: true, silent: true });
+                console.log('消息发送成功，已刷新会话消息');
             } else {
                 setError('发送消息失败');
                 console.warn('响应没有 data 字段', res);
