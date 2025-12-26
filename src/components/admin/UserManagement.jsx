@@ -68,13 +68,46 @@ const UserManagement = () => {
   // 自动拉黑未按时签到超过5次的用户
   const autoBlacklist = async () => {
     try {
-      // 在真实场景中调用API
-      // await adminApi.autoBlacklistUsers();
-      
-      // 模拟API调用
-      setAllUsers(prev => prev.map(u => ({ ...u, blacklisted: u.missedSignIns > 5 })));
+      const token = localStorage.getItem('access_token') || localStorage.getItem('authToken');
+      const threshold = 5;
+
+      const headers = new Headers();
+      headers.append('Accept', 'application/json');
+      headers.append('Content-Type', 'application/json');
+      if (token) {
+        headers.append('Authorization', `Bearer ${token}`);
+      }
+
+      const requestOptions = {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ threshold }),
+        redirect: 'follow'
+      };
+
+      const url = 'http://127.0.0.1:4523/m1/7500990-7236569-6684919/auth/admin/users/blacklist-by-noshow/';
+      const res = await fetch(url, requestOptions);
+
+      const contentType = res.headers.get('content-type') || '';
+      let result;
+      if (contentType.includes('application/json')) {
+        result = await res.json();
+      } else {
+        const text = await res.text();
+        try { result = JSON.parse(text); } catch { result = { message: text }; }
+      }
+
+      console.log('[autoBlacklist] 响应:', result);
+
+      if (!res.ok) {
+        const msg = (result && (result.message || result.detail)) || `${res.status} ${res.statusText}`;
+        throw new Error(msg);
+      }
+
+      // 成功后：前端本地更新，将未按时签到次数超过阈值的用户标记为黑名单
+      setUsers(prev => prev.map(u => ({ ...u, blacklisted: (u.missedSignIns || 0) > threshold })));
     } catch (err) {
-      setError('自动拉黑失败');
+      setError('自动拉黑失败：' + (err.message || '网络错误'));
       console.error('Error auto blacklisting:', err);
     }
   };
