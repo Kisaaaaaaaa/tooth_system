@@ -833,93 +833,130 @@ const DoctorProfile = () => {
                             </div>
                             <div className="mb-4">
                                 <label className="block text-sm font-medium text-slate-700 mb-1">邮箱地址</label>
-                                <input
-                                    type="email"
-                                    name="email"
-                                    value={formData.email}
-                                    onChange={handleFormChange}
-                                    placeholder="请输入邮箱地址"
-                                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                />
-                                <p className="text-xs text-slate-500 mt-1">仅修改邮箱或其它信息无需修改密码；修改密码需进行邮箱验证码验证。</p>
-                            </div>
-                            <div className="mb-4">
-                                <label className="block text-sm font-medium text-slate-700 mb-1">旧密码</label>
-                                {changePassword ? (
-                                    <input
-                                        type="password"
-                                        name="oldPassword"
-                                        value={formData.oldPassword}
-                                        onChange={handleFormChange}
-                                        placeholder="请输入当前密码"
-                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                    />
-                                ) : (
-                                    <input
-                                        type="password"
-                                        value="********"
-                                        disabled
-                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-slate-50 text-slate-500"
-                                    />
-                                )}
-                            </div>
-
-                            {/* 验证码区域（仅当修改密码时启用） */}
-                            <div className="mb-4">
-                                <label className="block text-sm font-medium text-slate-700 mb-1 flex justify-between">
-                                    <span>邮箱验证码</span>
-                                    {countdown > 0 && <span className="text-red-600 font-bold">{countdown}秒</span>}
-                                </label>
                                 <div className="flex gap-2">
                                     <input
-                                        type="text"
-                                        name="code"
-                                        value={verificationData.code}
-                                        onChange={(e)=> setVerificationData(prev => ({...prev, code: e.target.value}))}
-                                        placeholder="请输入验证码"
+                                        type="email"
+                                        name="email"
+                                        value={formData.email}
+                                        onChange={handleFormChange}
+                                        placeholder="请输入邮箱地址"
                                         className="flex-1 px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                        disabled={!changePassword}
                                     />
                                     <button
                                         type="button"
-                                        onClick={handleSendVerificationCode}
-                                        disabled={!changePassword || countdown>0}
-                                        className="px-3 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                                        onClick={async () => {
+                                            if (!formData.email || !formData.email.trim()) {
+                                                alert('请先输入邮箱地址');
+                                                return;
+                                            }
+                                            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                                            if (!emailRegex.test(formData.email.trim())) {
+                                                alert('请输入有效的邮箱地址');
+                                                return;
+                                            }
+                                            try {
+                                                // 使用与保存信息修改相同的接口逻辑
+                                                const userPayload = { email: formData.email.trim() };
+                                                const [userResult] = await Promise.allSettled([
+                                                    api.updateMe(userPayload)
+                                                ]);
+                                                
+                                                if (userResult.status === 'rejected') {
+                                                    throw new Error(userResult.reason?.message || userResult.reason || '保存失败');
+                                                }
+                                                
+                                                // 更新本地doctor数据
+                                                setDoctor(prev => ({ ...prev, email: formData.email.trim() }));
+                                                
+                                                // 同步到全局状态，让导航栏等其他组件也能实时更新
+                                                syncLocalUser({ email: formData.email.trim() });
+                                                
+                                                alert('✓ 邮箱保存成功！现在可以修改密码了');
+                                            } catch (err) {
+                                                console.error('保存邮箱失败:', err);
+                                                alert('保存邮箱失败：' + (err.message || '未知错误'));
+                                            }
+                                        }}
+                                        className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition whitespace-nowrap"
                                     >
-                                        {countdown>0 ? '重新发送' : '发送验证码'}
+                                        保存邮箱
                                     </button>
                                 </div>
-                            </div>
-
-                            <div className="space-y-4">
-                                <div>
-                                    <label className="block text-sm font-medium text-slate-700 mb-1">新密码</label>
-                                    <input
-                                        type="password"
-                                        name="newPassword"
-                                        value={formData.newPassword}
-                                        onChange={handleFormChange}
-                                        placeholder="留空表示不修改密码"
-                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                        disabled={!changePassword}
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-slate-700 mb-1">确认密码</label>
-                                    <input
-                                        type="password"
-                                        name="confirmPassword"
-                                        value={formData.confirmPassword}
-                                        onChange={handleFormChange}
-                                        placeholder="确认新密码"
-                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                        disabled={!changePassword}
-                                    />
-                                </div>
-                                <p className="text-sm text-blue-700 bg-blue-50 p-3 rounded">
-                                    <strong>重要提示：</strong>修改密码需要进行邮箱验证以保护您的账户安全
+                                <p className="text-xs text-slate-500 mt-1">
+                                    <strong className="text-orange-600">⚠️ 重要：</strong>修改密码前请先点击"保存邮箱"按钮保存邮箱地址，否则无法接收验证码
                                 </p>
                             </div>
+
+                            {/* 密码修改区域 - 仅在勾选"修改密码"时显示 */}
+                            {changePassword && (
+                                <>
+                                    <div className="mb-4">
+                                        <label className="block text-sm font-medium text-slate-700 mb-1">旧密码</label>
+                                        <input
+                                            type="password"
+                                            name="oldPassword"
+                                            value={formData.oldPassword}
+                                            onChange={handleFormChange}
+                                            placeholder="请输入当前密码"
+                                            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        />
+                                    </div>
+
+                                    {/* 验证码区域 */}
+                                    <div className="mb-4">
+                                        <label className="block text-sm font-medium text-slate-700 mb-1 flex justify-between">
+                                            <span>邮箱验证码</span>
+                                            {countdown > 0 && <span className="text-red-600 font-bold">{countdown}秒</span>}
+                                        </label>
+                                        <div className="flex gap-2">
+                                            <input
+                                                type="text"
+                                                name="code"
+                                                value={verificationData.code}
+                                                onChange={(e)=> setVerificationData(prev => ({...prev, code: e.target.value}))}
+                                                placeholder="请输入验证码"
+                                                className="flex-1 px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                            />
+                                            <button
+                                                type="button"
+                                                onClick={handleSendVerificationCode}
+                                                disabled={countdown>0}
+                                                className="px-3 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                                            >
+                                                {countdown>0 ? '重新发送' : '发送验证码'}
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <div className="space-y-4">
+                                        <div>
+                                            <label className="block text-sm font-medium text-slate-700 mb-1">新密码</label>
+                                            <input
+                                                type="password"
+                                                name="newPassword"
+                                                value={formData.newPassword}
+                                                onChange={handleFormChange}
+                                                placeholder="请输入新密码"
+                                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-slate-700 mb-1">确认密码</label>
+                                            <input
+                                                type="password"
+                                                name="confirmPassword"
+                                                value={formData.confirmPassword}
+                                                onChange={handleFormChange}
+                                                placeholder="确认新密码"
+                                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                            />
+                                        </div>
+                                        <p className="text-sm text-blue-700 bg-blue-50 p-3 rounded">
+                                            <strong>重要提示：</strong>修改密码需要进行邮箱验证以保护您的账户安全
+                                        </p>
+                                    </div>
+                                </>
+                            )}
                         </div>
 
                         <div className="flex gap-2 justify-end">
