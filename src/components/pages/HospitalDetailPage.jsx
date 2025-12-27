@@ -169,13 +169,6 @@ const HospitalDetailPage = ({ navigateTo, hospitalId, startConsultation, startAp
     // 按评分排序的医生排行榜
     const sortedDoctors = [...doctors].sort((a, b) => b.score - a.score);
 
-    // 当医生数据加载完成后设置默认选中医生
-    useEffect(() => {
-        if (doctors.length > 0) {
-            setSelectedDoctor(doctors[0]);
-        }
-    }, [doctors]);
-
     // 获取医生详情
     const fetchDoctorDetail = async (doctorId) => {
         if (!doctorId) return;
@@ -185,16 +178,18 @@ const HospitalDetailPage = ({ navigateTo, hospitalId, startConsultation, startAp
         try {
             // 调用真实API获取医生详情
             const response = await doctorsApi.getDoctorDetail(parseInt(doctorId));
-            // 根据APIFox文档，医生详情在response.data中
             const doctorDetail = response.data;
 
-            // 更新选中的医生信息，合并详情数据
+            // 关键补充：从详情数据中提取评论
+            const reviews = doctorDetail?.reviews_data?.results || [];
+
+            // 更新选中的医生信息，合并详情数据和评论数据
             setSelectedDoctor(prev => ({
                 ...prev,
-                ...doctorDetail
+                ...doctorDetail,
+                reviewsData: reviews // 将评论挂载到 selectedDoctor 对象上
             }));
         } catch (err) {
-            // API调用失败时保持现有数据
             setDoctorDetailError('获取医生详情失败');
             console.error('获取医生详情失败:', err);
         } finally {
@@ -409,24 +404,28 @@ const HospitalDetailPage = ({ navigateTo, hospitalId, startConsultation, startAp
                                     <p className="text-red-500 mb-2">{doctorDetailError}</p>
                                     <p className="text-slate-600">将显示基本医生信息</p>
                                 </div>
-                            ) : selectedDoctor.reviewsData?.length > 0 ? (
+                            ) : selectedDoctor.reviewsData && selectedDoctor.reviewsData.length > 0 ? (
                                 selectedDoctor.reviewsData.map(review => (
-                                    <div key={review.id} className="border-b border-slate-100 pb-4 last:border-0 last:pb-0">
+                                    <div key={review.id || review.created_at} className="border-b border-slate-100 pb-4 last:border-0 last:pb-0">
                                         <div className="flex items-center justify-between mb-2">
                                             <div className="flex items-center gap-2">
-                                                <span className="font-medium text-slate-700">{review.patient}</span>
+                                                <span className="font-medium text-slate-700">{review.patient_name || '匿名用户'}</span>
                                                 <div className="flex items-center gap-1 text-yellow-500">
                                                     {[...Array(5)].map((_, i) => (
-                                                        <Star key={i} size={12} className={i < review.rating ? "fill-yellow-500" : ""} />
+                                                        <Star key={i} size={12} className={i < review.rating ? "fill-current" : "text-slate-300"} />
                                                     ))}
                                                 </div>
                                             </div>
                                             <div className="flex items-center gap-1 text-sm text-slate-500">
                                                 <Clock size={12} />
-                                                <span>{review.date}</span>
+                                                <span>{new Date(review.created_at).toLocaleDateString()}</span>
                                             </div>
                                         </div>
-                                        <p className="text-slate-600 leading-relaxed">{review.content}</p>
+                                        <div className="min-h-[72px] max-h-[140px] overflow-hidden rounded-lg bg-white/70 border border-slate-200 px-4 py-3">
+                                            <div className="max-h-[120px] overflow-y-auto pr-2 custom-scrollbar">
+                                                <p className="text-slate-600 leading-6 break-words whitespace-pre-wrap block">{review.comment || '用户未填写评价。'}</p>
+                                            </div>
+                                        </div>
                                     </div>
                                 ))
                             ) : (
@@ -436,7 +435,7 @@ const HospitalDetailPage = ({ navigateTo, hospitalId, startConsultation, startAp
                             )
                         ) : (
                             <div className="text-center py-8">
-                                <p className="text-slate-500">请选择一位医生查看评论</p>
+                                <p className="text-slate-500">请从左侧选择一位医生查看评论</p>
                             </div>
                         )}
                     </div>

@@ -209,7 +209,7 @@ const DoctorDetailPage = ({ navigateTo }) => {
                 appointment_date: date,
                 appointment_time: normalizedTime,
             };
-            if (symptoms?.trim()) payload.symptoms = symptoms.trim();
+            if (symptoms?.trim()) payload.symptoms = symptoms.trim().slice(0, 100);
             if (patientName?.trim()) payload.patient_name = patientName.trim();
             if (patientPhone?.trim()) payload.patient_phone = patientPhone.trim();
 
@@ -385,8 +385,8 @@ const DoctorDetailPage = ({ navigateTo }) => {
                                         </svg>
                                     </span>
                                     <div>
-                                        <p className="text-sm text-slate-500">从业经验</p>
-                                        <p className="font-medium">{doctor.experience || '暂无信息'}</p>
+                                        <p className="text-sm text-slate-500">学历背景</p>
+                                        <p className="font-medium">{doctor.education || '暂无信息'}</p>
                                     </div>
                                 </div>
                                 <div className="flex items-start gap-2">
@@ -397,8 +397,8 @@ const DoctorDetailPage = ({ navigateTo }) => {
                                         </svg>
                                     </span>
                                     <div>
-                                        <p className="text-sm text-slate-500">学历背景</p>
-                                        <p className="font-medium">{doctor.education || '暂无信息'}</p>
+                                        <p className="text-sm text-slate-500">从业经验</p>
+                                        <p className="font-medium">{doctor.experience || '暂无信息'}</p>
                                     </div>
                                 </div>
                                 <div className="flex items-start gap-2">
@@ -410,7 +410,7 @@ const DoctorDetailPage = ({ navigateTo }) => {
                                     </span>
                                     <div>
                                         <p className="text-sm text-slate-500">医生简介</p>
-                                        <p className="font-medium line-clamp-1">{doctor.introduction || '暂无信息'}</p>
+                                        <p className="font-medium">{doctor.introduction || '暂无信息'}</p>
                                     </div>
                                 </div>
                             </div>
@@ -511,7 +511,15 @@ const DoctorDetailPage = ({ navigateTo }) => {
                                 <div className="border border-slate-300 rounded-lg p-4 bg-slate-50">
                                     <div className="grid grid-cols-4 gap-3">
                                         {timeSlots.map((slot) => {
-                                            const disabled = !date;
+                                            // 如果选择的是今天，则需要禁用已过去的时间点
+                                            const isToday = selectedDate && formatDateKey(selectedDate) === formatDateKey(new Date());
+                                            const now = new Date();
+                                            const [slotHour, slotMinute] = slot.value.split(':').map(Number);
+
+                                            // 只有当日期是今天，且时间点早于当前时间时，才禁用
+                                            const isPast = isToday && (slotHour < now.getHours() || (slotHour === now.getHours() && slotMinute < now.getMinutes()));
+
+                                            const disabled = !date || isPast;
                                             const selected = timeSlot === slot.value;
                                             return (
                                                 <button
@@ -563,11 +571,15 @@ const DoctorDetailPage = ({ navigateTo }) => {
                                 </label>
                                 <textarea
                                     value={symptoms}
-                                    onChange={e => setSymptoms(e.target.value)}
+                                    maxLength={100}
+                                    onChange={e => setSymptoms((e.target.value || '').slice(0, 100))}
                                     className="w-full px-4 py-3 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 outline-none transition-all resize-none"
                                     rows={4}
                                     placeholder="请简要描述您的症状（选填）"
                                 ></textarea>
+                                <div className="mt-1 text-xs text-slate-400 text-right">
+                                    {(symptoms || '').length}/100
+                                </div>
                             </div>
 
                             {/* 错误提示 */}
@@ -642,8 +654,12 @@ const DoctorDetailPage = ({ navigateTo }) => {
                                                 {r.diagnosis}
                                             </div>
                                         ) : null}
-                                        <div className="mt-3 text-sm text-slate-700 whitespace-pre-wrap">
-                                            {r.comment ? r.comment : <span className="text-slate-400 italic">（用户未填写文字评价）</span>}
+                                        <div className="mt-3 min-h-[72px] max-h-[140px] overflow-hidden rounded-lg bg-white/70 border border-slate-200 px-4 py-3">
+                                            <div className="max-h-[120px] overflow-y-auto pr-2 custom-scrollbar">
+                                                <div className="text-sm text-slate-700 whitespace-pre-wrap break-words leading-6 block">
+                                                    {r.comment ? r.comment : <span className="text-slate-400 italic">（用户未填写文字评价）</span>}
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
                                 ))}

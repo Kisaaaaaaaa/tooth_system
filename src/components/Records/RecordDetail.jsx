@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import recordsApi from '../../api/records';
-import { Star, ExternalLink, ChevronLeft, Download } from 'lucide-react'; // 引入返回箭头图标
+import { Star, ExternalLink, ChevronLeft } from 'lucide-react'; // 引入返回箭头图标
 
 const StarsInput = ({ value = 0, onChange }) => {
     const [v, setV] = useState(value);
@@ -48,80 +48,7 @@ const RecordDetail = ({ id, onClose, onRated }) => {
     const [submitting, setSubmitting] = useState(false);
     const [imageError, setImageError] = useState(false);
 
-    const formatDateForFilename = (raw) => {
-        if (!raw) return '';
-        try {
-            const d = new Date(raw);
-            if (!Number.isNaN(d.getTime())) {
-                const y = d.getFullYear();
-                const m = String(d.getMonth() + 1).padStart(2, '0');
-                const day = String(d.getDate()).padStart(2, '0');
-                return `${y}${m}${day}`;
-            }
-        } catch {
-            // ignore
-        }
-        // 兜底：提取类似 2025-12-25 的日期
-        const m = String(raw).match(/(\d{4})-(\d{2})-(\d{2})/);
-        if (m) return `${m[1]}${m[2]}${m[3]}`;
-        return '';
-    };
 
-    const handleDownloadRecord = () => {
-        if (!record) return;
-
-        const lines = [];
-        lines.push('牙科就诊病例');
-        lines.push('================');
-        lines.push(`病例ID：${record.id ?? id ?? ''}`);
-        lines.push(`主治医生：${record.doctor_name || record.doctor || '-'}`);
-        lines.push(`就诊时间：${record.date || record.created_at || '未知时间'}`);
-        lines.push('');
-        lines.push(`诊断：${record.diagnosis || '-'}`);
-        lines.push('');
-        lines.push('处置/记录：');
-        lines.push(String(record.content || record.summary || '-'));
-
-        if (record.treatment) {
-            lines.push('');
-            lines.push(`治疗方案：${record.treatment}`);
-        }
-
-        if (Array.isArray(record.medications) && record.medications.length > 0) {
-            lines.push('');
-            lines.push(`药物：${record.medications.join('、')}`);
-        }
-
-        if (record.result_image) {
-            lines.push('');
-            lines.push(`结果图片链接：${record.result_image}`);
-        }
-
-        if (record.rated) {
-            lines.push('');
-            lines.push('评价：');
-            lines.push(`评分：${record.rating ?? ''}`);
-            lines.push(`评价内容：${record.comment || '无'}`);
-        }
-
-        const content = lines.join('\n');
-        const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
-        const url = URL.createObjectURL(blob);
-
-        const dateKey = formatDateForFilename(record.date || record.created_at);
-        const safeId = record.id ?? id ?? 'record';
-        const filename = `病例_${safeId}${dateKey ? `_${dateKey}` : ''}.txt`;
-
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = filename;
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-
-        // 释放 blob url
-        setTimeout(() => URL.revokeObjectURL(url), 0);
-    };
 
     useEffect(() => {
         if (!id) return;
@@ -179,21 +106,11 @@ const RecordDetail = ({ id, onClose, onRated }) => {
                     >
                         <ChevronLeft size={20} />
                     </button>
-                    {/* 标题：移除多余文字，仅保留就诊详情 */}
+                    {/* 标题就诊详情 */}
                     <h3 className="text-xl font-semibold text-sky-800">就诊详情</h3>
                 </div>
-                {/* 右上角：下载病例 */}
-                <button
-                    type="button"
-                    onClick={handleDownloadRecord}
-                    disabled={!record || loading}
-                    className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-white border border-sky-200 text-sky-700 hover:bg-sky-100 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-                    aria-label="下载病例"
-                    title={!record ? '病例未加载完成' : '下载病例'}
-                >
-                    <Download size={16} />
-                    下载病例
-                </button>
+                {/* 右上角留空 */}
+                <div />
             </div>
 
             {/* 加载/错误提示：浅蓝色加载样式，保留红色错误警示 */}
@@ -297,53 +214,60 @@ const RecordDetail = ({ id, onClose, onRated }) => {
 
                     {/* 评价区域：浅蓝色风格统一，按钮居中 */}
                     <div className="pt-4 border-t border-sky-100">
-                        <div className="text-sm font-medium text-sky-800 mb-3">评价</div>
                         {record?.rated ? (
-                            <div className="flex items-center gap-2 p-3 bg-sky-50 rounded-lg border border-sky-100">
-                                <div className="flex text-amber-500 gap-1">
-                                    {[...Array(record.rating || 0)].map((_, i) => (
-                                        <Star key={i} size={18} fill="currentColor" />
-                                    ))}
+                            <div className="space-y-2">
+                                <div className="flex items-center gap-3">
+                                    <div className="text-sm font-medium text-sky-800">评价</div>
+                                    <div className="flex text-amber-500 gap-1">
+                                        {[...Array(record.rating || 0)].map((_, i) => (
+                                            <Star key={i} size={16} fill="currentColor" />
+                                        ))}
+                                    </div>
                                 </div>
-                                <div className="text-sm text-slate-600">{record.comment || '无评价内容'}</div>
+                                <div className="p-3 bg-sky-50 rounded-lg border border-sky-100">
+                                    <div className="text-sm text-slate-600 min-w-0 break-words">{record.comment || '无评价内容'}</div>
+                                </div>
                             </div>
                         ) : (
                             record && (
-                                <div className="space-y-3">
-                                    <StarsInput value={rating} onChange={setRating} />
-                                    <textarea
-                                        value={comment}
-                                        onChange={(e) => setComment(e.target.value)}
-                                        className="w-full border border-sky-200 rounded-lg p-3 text-sm focus:outline-none focus:ring-2 focus:ring-sky-200 focus:border-sky-400 transition-all bg-sky-50/50"
-                                        rows={3}
-                                        placeholder="写下你的评价（可选）"
-                                    />
-                                    {/* 按钮居中，样式优化 */}
-                                    <div className="flex gap-3 justify-center">
-                                        {/* 此处可保留下方关闭按钮，或根据需求移除（标题栏已新增返回按钮） */}
-                                        <button
-                                            onClick={onClose}
-                                            disabled={submitting}
-                                            className="px-5 py-2 bg-slate-100 text-slate-700 rounded-lg text-sm hover:bg-slate-200 transition-colors disabled:opacity-70 disabled:cursor-not-allowed"
-                                        >
-                                            关闭
-                                        </button>
-                                        <button
-                                            onClick={handleSubmit}
-                                            disabled={submitting}
-                                            className="px-5 py-2 bg-sky-600 text-white rounded-lg text-sm hover:bg-sky-700 disabled:bg-sky-400 disabled:cursor-not-allowed transition-colors shadow-sm hover:shadow-sky-200"
-                                        >
-                                            {submitting ? (
-                                                <span className="flex items-center gap-1.5">
-                                                    <span className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full"></span>
-                                                    提交中...
-                                                </span>
-                                            ) : (
-                                                '提交评价'
-                                            )}
-                                        </button>
+                                <>
+                                    <div className="text-sm font-medium text-sky-800 mb-3">评价</div>
+                                    <div className="space-y-3">
+                                        <StarsInput value={rating} onChange={setRating} />
+                                        <textarea
+                                            value={comment}
+                                            onChange={(e) => setComment(e.target.value)}
+                                            className="w-full border border-sky-200 rounded-lg p-3 text-sm focus:outline-none focus:ring-2 focus:ring-sky-200 focus:border-sky-400 transition-all bg-sky-50/50"
+                                            rows={3}
+                                            placeholder="写下你的评价（可选）"
+                                        />
+                                        {/* 按钮居中，样式优化 */}
+                                        <div className="flex gap-3 justify-center">
+                                            {/* 此处可保留下方关闭按钮，或根据需求移除（标题栏已新增返回按钮） */}
+                                            <button
+                                                onClick={onClose}
+                                                disabled={submitting}
+                                                className="px-5 py-2 bg-slate-100 text-slate-700 rounded-lg text-sm hover:bg-slate-200 transition-colors disabled:opacity-70 disabled:cursor-not-allowed"
+                                            >
+                                                关闭
+                                            </button>
+                                            <button
+                                                onClick={handleSubmit}
+                                                disabled={submitting}
+                                                className="px-5 py-2 bg-sky-600 text-white rounded-lg text-sm hover:bg-sky-700 disabled:bg-sky-400 disabled:cursor-not-allowed transition-colors shadow-sm hover:shadow-sky-200"
+                                            >
+                                                {submitting ? (
+                                                    <span className="flex items-center gap-1.5">
+                                                        <span className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full"></span>
+                                                        提交中...
+                                                    </span>
+                                                ) : (
+                                                    '提交评价'
+                                                )}
+                                            </button>
+                                        </div>
                                     </div>
-                                </div>
+                                </>
                             )
                         )}
                     </div>
