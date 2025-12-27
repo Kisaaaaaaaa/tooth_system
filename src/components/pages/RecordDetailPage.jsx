@@ -8,17 +8,6 @@ const RecordDetailPage = () => {
 
     return (
         <div className="space-y-4 animate-fade-in">
-            <div className="flex items-center justify-between">
-                <button
-                    type="button"
-                    onClick={() => navigate(-1)}
-                    className="px-3 py-2 rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50 transition"
-                >
-                    返回
-                </button>
-                <div className="text-sm text-slate-500">病历详情</div>
-            </div>
-
             <RecordDetail
                 id={id}
                 onClose={() => navigate(-1)}

@@ -200,23 +200,16 @@ const HospitalsPage = ({ navigateTo }) => {
                                         <Navigation size={16} />
                                     </button>
                                 </div>
-                            </div>
-
-                            {/* 医院电话 */}
-                            <div className="text-slate-600 text-sm flex items-center gap-2">
-                                <Phone size={16} className="text-slate-400" />
-                                <span>{hospital.phone}</span>
-                            </div>
-
-                            {/* 医院地址 */}
-                            <div className="text-slate-500 text-sm flex items-center justify-between gap-2">
-                                <div className="flex items-center gap-2">
-                                    <MapPin size={14} />
-                                    <span className="flex-1 truncate">{hospital.address}</span>
+                                <div className="flex items-center gap-2 text-sm text-slate-500 mt-1">
+                                    <Phone size={14} className="flex-shrink-0" />
+                                    <span>{hospital.phone || '暂无联系电话'}</span>
+                                </div>
+                                <div className="flex items-start gap-2 text-sm text-slate-500 mt-1">
+                                    <MapPin size={14} className="mt-0.5 flex-shrink-0" />
+                                    <p className="break-words">{hospital.address}</p>
                                 </div>
                             </div>
 
-                            {/* 查看详情按钮 */}
                             <button
                                 className="mt-2 w-full py-2 bg-cyan-50 text-cyan-600 hover:bg-cyan-100 text-sm font-medium rounded-lg flex items-center justify-center gap-1 transition-colors"
                                 onClick={() => navigateTo('hospitalDetail', { hospitalId: hospital.id })}

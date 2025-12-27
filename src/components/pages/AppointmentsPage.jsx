@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from 'react';
-import { createPortal } from 'react-dom';
 import { Calendar, Clock, Navigation } from 'lucide-react';
 import appointmentsApi from '../../api/appointments';
 import hospitalsApi from '../../api/hospitals';
@@ -157,7 +156,7 @@ const AppointmentsPage = () => {
 
     return (
         <div className="relative">
-            <div className="max-w-4xl mx-auto p-4 pb-24 space-y-4 animate-fade-in">
+            <div className="max-w-4xl mx-auto p-4 space-y-4 animate-fade-in">
                 <div className="mb-4 flex flex-col md:flex-row md:items-center md:justify-between gap-2">
                     <div className="p-3 bg-yellow-50 border-l-4 border-yellow-400 text-yellow-800 rounded md:mb-0">
                         请在预约时间后的30分钟内完成签到
@@ -281,22 +280,41 @@ const AppointmentsPage = () => {
                     })}
                 </div>
 
-            </div>
-
-            {/* 分页（通过 portal 渲染到 body，确保固定在视口底部） */}
-            {typeof document !== 'undefined' && createPortal(
-                <div className="fixed bottom-0 left-0 right-0 flex justify-center z-50">
-                    <div className="max-w-4xl w-full bg-white/95 backdrop-blur-sm border-t border-slate-200 py-3 px-4 flex items-center justify-between shadow-lg">
-                        <div>共 {total} 条</div>
-                        <div className="flex gap-2">
-                            <button disabled={page <= 1} onClick={() => { setPage(p => { const np = Math.max(1, p - 1); fetchList(np, statusFilter); return np; }); }} className="px-3 py-1 border rounded">上一页</button>
-                            <div className="px-3 py-1 border rounded">{page}</div>
-                            <button disabled={appointments.length < pageSize} onClick={() => { setPage(p => { const np = p + 1; fetchList(np, statusFilter); return np; }); }} className="px-3 py-1 border rounded">下一页</button>
-                        </div>
+                {/* 分页（非固定，样式与病例列表一致） */}
+                <div className="flex flex-col items-center gap-2 py-4 border-t border-slate-200">
+                    <div className="text-xs text-slate-500">
+                        共 {total} 条 · 第 {page} 页
                     </div>
-                </div>,
-                document.body
-            )}
+                    <div className="flex gap-3">
+                        <button
+                            disabled={page <= 1}
+                            onClick={() => {
+                                setPage(p => {
+                                    const np = Math.max(1, p - 1);
+                                    fetchList(np, statusFilter);
+                                    return np;
+                                });
+                            }}
+                            className="px-3 py-1 border rounded text-sm disabled:opacity-40"
+                        >
+                            上一页
+                        </button>
+                        <button
+                            disabled={total > 0 && page * pageSize >= total}
+                            onClick={() => {
+                                setPage(p => {
+                                    const np = p + 1;
+                                    fetchList(np, statusFilter);
+                                    return np;
+                                });
+                            }}
+                            className="px-3 py-1 border rounded text-sm disabled:opacity-40"
+                        >
+                            下一页
+                        </button>
+                    </div>
+                </div>
+            </div>
         </div>
     );
 };
