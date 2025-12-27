@@ -22,6 +22,17 @@ const AiInquiryPage = () => {
   const fileInputRef = useRef(null);
   const scrollRef = useRef(null);
   const [highlightMessageId, setHighlightMessageId] = useState(null);
+  const shouldAutoScrollRef = useRef(true);
+
+  const scrollToBottom = (behavior = 'auto') => {
+    const el = scrollRef.current;
+    if (!el) return;
+    try {
+      el.scrollTo({ top: el.scrollHeight, behavior });
+    } catch (_) {
+      el.scrollTop = el.scrollHeight;
+    }
+  };
 
   // 把后端“逐条历史消息”映射成当前聊天窗口可渲染的 messages
   const mapHistoryResultsToMessages = (results = []) => {
@@ -94,6 +105,26 @@ const AiInquiryPage = () => {
     fetchHistory();
   }, []);
 
+  // 监听滚动：用户如果往上翻，就不要强制自动拉到底；用户回到接近底部则恢复自动滚动
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const onScroll = () => {
+      const distanceToBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+      shouldAutoScrollRef.current = distanceToBottom < 120;
+    };
+    el.addEventListener('scroll', onScroll, { passive: true });
+    return () => el.removeEventListener('scroll', onScroll);
+  }, []);
+
+  // messages 变化时：如果用户本来就在底部附近，则自动滚到最新
+  useEffect(() => {
+    if (shouldAutoScrollRef.current) {
+      // 用 rAF 等待 DOM 更新
+      requestAnimationFrame(() => scrollToBottom('auto'));
+    }
+  }, [messages.length]);
+
   const searchInHistory = async (keyword) => {
     return await aiHistoryApi.searchHistory({ keyword, page: 1, page_size: 100 });
   };
@@ -157,6 +188,10 @@ const AiInquiryPage = () => {
 
   const pushMessage = (msg) => {
     setMessages((m) => [...m, msg]);
+    // push 后立刻尝试滚动，配合上面的 effect 更稳
+    requestAnimationFrame(() => {
+      if (shouldAutoScrollRef.current) scrollToBottom('smooth');
+    });
   };
 
   const mapSuggestionLevel = (lvl) => {
@@ -220,6 +255,9 @@ const AiInquiryPage = () => {
         ts: Date.now(),
       });
 
+      // 收到 AI 回复后确保可见
+      requestAnimationFrame(() => scrollToBottom('smooth'));
+
       // 发送成功后清空待发送附件
       if (effectiveUploads.length) setPendingUploads([]);
 
@@ -230,6 +268,7 @@ const AiInquiryPage = () => {
         const results2 = data2?.results;
         if (Array.isArray(results2)) {
           setMessages(mapHistoryResultsToMessages(results2));
+          requestAnimationFrame(() => scrollToBottom('auto'));
           const grouped2 = aiHistoryApi.groupHistoryMessages
             ? aiHistoryApi.groupHistoryMessages(results2, { gapMinutes: 20 })
             : [];
@@ -245,7 +284,7 @@ const AiInquiryPage = () => {
     } finally {
       setLoading(false);
       setTimeout(() => {
-        if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+        if (shouldAutoScrollRef.current) scrollToBottom('auto');
       }, 50);
     }
   };
@@ -329,6 +368,8 @@ const AiInquiryPage = () => {
     try {
       setError(null);
       setLoading(true);
+      // 用户在做“消息定位/查历史”，不要自动滚到底部
+      shouldAutoScrollRef.current = false;
       const data = await aiHistoryApi.getMessageLocation(messageId);
       const context = Array.isArray(data?.context) ? data.context : [];
       const mapped = context.map((m) => ({
@@ -358,7 +399,7 @@ const AiInquiryPage = () => {
   };
 
   return (
-    <div className="w-full min-h-screen bg-slate-50 pb-40">
+    <div className="w-full min-h-screen bg-slate-50 overflow-hidden">
       <SearchChatModal
         open={searchModalOpen}
         onClose={() => setSearchModalOpen(false)}
@@ -369,162 +410,168 @@ const AiInquiryPage = () => {
         }}
       />
 
-      <div className="max-w-5xl mx-auto px-4 pt-4 md:pt-6">
-        {/* 聊天区卡片 */}
-        <div className="bg-white border border-slate-200 rounded-2xl shadow-sm flex flex-col max-h-[68vh]">
-          <div className="px-4 py-3 border-b border-slate-200 flex items-center justify-between">
-            <div className="text-xs text-slate-500">{messages.length ? `共 ${messages.length} 条消息` : '开始一个新的问询吧'}</div>
-            <div className="flex items-center gap-3">
-              <div className="text-xs text-slate-400">{loading ? 'AI 正在思考…' : ''}</div>
-              <button
-                type="button"
-                onClick={() => setSearchModalOpen(true)}
-                className="inline-flex items-center gap-2 h-9 px-3 rounded-xl text-sm font-semibold text-white bg-gradient-to-br from-cyan-600 to-blue-600 shadow-sm hover:shadow-md active:scale-[0.99] transition focus:outline-none focus:ring-2 focus:ring-cyan-200"
-                aria-label="搜索聊天记录"
-              >
-                <Search size={16} />
-                搜索聊天
-              </button>
-            </div>
-          </div>
-
-          <div ref={scrollRef} className="flex-1 overflow-auto px-4 py-4 flex flex-col gap-4 scroll-smooth bg-white">
-            {messages.length === 0 && (
-              <div className="text-sm text-slate-600">
-                <div className="font-medium text-slate-800">你可以这样问：</div>
-                <ul className="mt-2 space-y-1 text-slate-600 list-disc pl-5">
-                  <li>“左下牙咬东西疼，持续两天了，会不会是蛀牙？”</li>
-                  <li>“刷牙出血、口臭，应该挂什么科？”</li>
-                  <li>“智齿反复发炎，需要拔吗？”</li>
-                </ul>
+      {/* 固定聊天框：顶部避开导航栏（约64px），底部避开输入框（约128px） */}
+      <div className="fixed left-0 right-0 top-16 bottom-32 z-10">
+        <div className="max-w-5xl mx-auto h-full px-4 pt-4 md:pt-6">
+          {/* 聊天区卡片 */}
+          <div className="bg-white border border-slate-200 rounded-2xl shadow-sm flex flex-col h-full">
+            <div className="px-4 py-3 border-b border-slate-200 flex items-center justify-between">
+              <div className="text-xs text-slate-500">{messages.length ? `共 ${messages.length} 条消息` : '开始一个新的问询吧'}</div>
+              <div className="flex items-center gap-3">
+                <div className="text-xs text-slate-400">{loading ? 'AI 正在思考…' : ''}</div>
+                <button
+                  type="button"
+                  onClick={() => setSearchModalOpen(true)}
+                  className="inline-flex items-center gap-2 h-9 px-3 rounded-xl text-sm font-semibold text-white bg-gradient-to-br from-cyan-600 to-blue-600 shadow-sm hover:shadow-md active:scale-[0.99] transition focus:outline-none focus:ring-2 focus:ring-cyan-200"
+                  aria-label="搜索聊天记录"
+                >
+                  <Search size={16} />
+                  搜索聊天
+                </button>
               </div>
-            )}
+            </div>
 
-            {messages.map((m, idx) => {
-              const isUser = m.role === 'user';
-              const prev = idx > 0 ? messages[idx - 1] : null;
-              const showTimeDivider = shouldShowTimeDivider(prev, m);
-              const dividerText = formatTime(m.created_at || m.ts);
+            <div ref={scrollRef} className="flex-1 overflow-auto px-4 py-4 flex flex-col gap-4 scroll-smooth bg-white">
+              {messages.length === 0 && (
+                <div className="text-sm text-slate-600">
+                  <div className="font-medium text-slate-800">你可以这样问：</div>
+                  <ul className="mt-2 space-y-1 text-slate-600 list-disc pl-5">
+                    <li>“左下牙咬东西疼，持续两天了，会不会是蛀牙？”</li>
+                    <li>“刷牙出血、口臭，应该挂什么科？”</li>
+                    <li>“智齿反复发炎，需要拔吗？”</li>
+                  </ul>
+                </div>
+              )}
 
-              return (
-                <React.Fragment key={idx}>
-                  {showTimeDivider && dividerText && (
-                    <div className="flex justify-center">
-                      <div className="px-3 py-1 rounded-full bg-slate-100 text-slate-500 text-[11px] border border-slate-200">
-                        {dividerText}
-                      </div>
-                    </div>
-                  )}
+              {messages.map((m, idx) => {
+                const isUser = m.role === 'user';
+                const prev = idx > 0 ? messages[idx - 1] : null;
+                const showTimeDivider = shouldShowTimeDivider(prev, m);
+                const dividerText = formatTime(m.created_at || m.ts);
 
-                  <div
-                    data-message-id={m?._messageId}
-                    className={`flex items-end gap-2 ${isUser ? 'justify-end' : 'justify-start'}`}
-                  >
-                    {!isUser && (
-                      <div className="w-9 h-9 rounded-2xl bg-gradient-to-br from-cyan-500 to-blue-500 text-white flex items-center justify-center shadow flex-shrink-0">
-                        AI
+                return (
+                  <React.Fragment key={idx}>
+                    {showTimeDivider && dividerText && (
+                      <div className="flex justify-center">
+                        <div className="px-3 py-1 rounded-full bg-slate-100 text-slate-500 text-[11px] border border-slate-200">
+                          {dividerText}
+                        </div>
                       </div>
                     )}
 
-                    <div className="max-w-[86%]">
-                      <div
-                        className={
-                          `text-sm whitespace-pre-wrap px-4 py-3 shadow-sm ` +
-                          (isUser
-                            ? 'bg-gradient-to-br from-cyan-600 to-blue-600 text-white rounded-2xl rounded-br-md'
-                            : 'bg-white text-slate-900 border border-slate-200 rounded-2xl rounded-bl-md') +
-                          (highlightMessageId && m?._messageId === highlightMessageId ? ' ring-2 ring-cyan-300' : '')
-                        }
-                      >
-                        {m.text}
-                        {!isUser && m?.meta?.uploaded_file?.url && (
-                          <div className="mt-3">
-                            <a
-                              href={m.meta.uploaded_file.url}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="block rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 hover:border-cyan-200"
-                            >
-                              <div className="flex items-center justify-between gap-2">
-                                <div className="text-sm font-semibold text-slate-900 truncate">
-                                  📎 {m.meta.uploaded_file.filename || '已上传文件'}
-                                </div>
-                                {typeof m.meta.uploaded_file.size === 'number' && (
-                                  <div className="text-[11px] text-slate-500 flex-shrink-0">
-                                    {(m.meta.uploaded_file.size / 1024).toFixed(1)} KB
+                    <div
+                      data-message-id={m?._messageId}
+                      className={`flex items-end gap-2 ${isUser ? 'justify-end' : 'justify-start'}`}
+                    >
+                      {!isUser && (
+                        <div className="w-9 h-9 rounded-2xl bg-gradient-to-br from-cyan-500 to-blue-500 text-white flex items-center justify-center shadow flex-shrink-0">
+                          AI
+                        </div>
+                      )}
+
+                      <div className="max-w-[86%]">
+                        <div
+                          className={
+                            `text-sm whitespace-pre-wrap px-4 py-3 shadow-sm ` +
+                            (isUser
+                              ? 'bg-gradient-to-br from-cyan-600 to-blue-600 text-white rounded-2xl rounded-br-md'
+                              : 'bg-white text-slate-900 border border-slate-200 rounded-2xl rounded-bl-md') +
+                            (highlightMessageId && m?._messageId === highlightMessageId ? ' ring-2 ring-cyan-300' : '')
+                          }
+                        >
+                          {m.text}
+                          {!isUser && m?.meta?.uploaded_file?.url && (
+                            <div className="mt-3">
+                              <a
+                                href={m.meta.uploaded_file.url}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="block rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 hover:border-cyan-200"
+                              >
+                                <div className="flex items-center justify-between gap-2">
+                                  <div className="text-sm font-semibold text-slate-900 truncate">
+                                    📎 {m.meta.uploaded_file.filename || '已上传文件'}
                                   </div>
-                                )}
-                              </div>
-                              <div className="mt-1 text-xs text-slate-600 truncate">{m.meta.uploaded_file.url}</div>
-                              <div className="mt-2 text-[11px] text-slate-400">点击打开链接</div>
-                            </a>
-                          </div>
-                        )}
-                        {m.files && (
-                          <div className={`mt-2 text-xs ${isUser ? 'text-white/80' : 'text-slate-500'}`}>
-                            附件：{m.files.map((f) => f.name).join(', ')}
-                          </div>
-                        )}
-
-                        {/* assistant 结构化信息：建议等级 + 推荐医生 */}
-                        {!isUser && m.meta && (
-                          <div className="mt-3 space-y-3">
-                            {m.meta.suggestion_level && (
-                              <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full border text-xs ${mapSuggestionLevel(m.meta.suggestion_level).cls}`}>
-                                <span className="font-semibold">就医建议</span>
-                                <span>{mapSuggestionLevel(m.meta.suggestion_level).text}</span>
-                              </div>
-                            )}
-
-                            {Array.isArray(m.meta.recommended_doctors) && m.meta.recommended_doctors.length > 0 && (
-                              <div>
-                                <div className="text-xs font-semibold text-slate-800 mb-2">推荐医生</div>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                  {m.meta.recommended_doctors.map((d, i) => (
-                                    <button
-                                      key={d?.id ?? i}
-                                      type="button"
-                                      onClick={() => {
-                                        if (d?.id) navigate(`/doctors/${d.id}`);
-                                      }}
-                                      className="text-left p-3 rounded-2xl border border-slate-200 hover:border-cyan-200 hover:shadow-md transition bg-white"
-                                    >
-                                      <div className="flex items-center justify-between gap-2">
-                                        <div className="font-semibold text-slate-900 truncate">{d?.name || '医生'}</div>
-                                        {d?.next_available_time && (
-                                          <div className="text-[11px] text-slate-500 flex-shrink-0">{d.next_available_time}</div>
-                                        )}
-                                      </div>
-                                      <div className="mt-1 text-xs text-slate-600 truncate">
-                                        {(d?.department_name ? `${d.department_name}` : '')}{d?.title ? ` · ${d.title}` : ''}
-                                      </div>
-                                      {d?.good_at && (
-                                        <div className="mt-2 text-xs text-slate-500 line-clamp-2">擅长：{d.good_at}</div>
-                                      )}
-                                      <div className="mt-2 text-[11px] text-slate-400">查看医生详情</div>
-                                    </button>
-                                  ))}
+                                  {typeof m.meta.uploaded_file.size === 'number' && (
+                                    <div className="text-[11px] text-slate-500 flex-shrink-0">
+                                      {(m.meta.uploaded_file.size / 1024).toFixed(1)} KB
+                                    </div>
+                                  )}
                                 </div>
-                              </div>
-                            )}
-                          </div>
-                        )}
+                                <div className="mt-1 text-xs text-slate-600 truncate">{m.meta.uploaded_file.url}</div>
+                                <div className="mt-2 text-[11px] text-slate-400">点击打开链接</div>
+                              </a>
+                            </div>
+                          )}
+                          {m.files && (
+                            <div className={`mt-2 text-xs ${isUser ? 'text-white/80' : 'text-slate-500'}`}>
+                              附件：{m.files.map((f) => f.name).join(', ')}
+                            </div>
+                          )}
+
+                          {/* assistant 结构化信息：建议等级 + 推荐医生 */}
+                          {!isUser && m.meta && (
+                            <div className="mt-3 space-y-3">
+                              {m.meta.suggestion_level && (
+                                <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full border text-xs ${mapSuggestionLevel(m.meta.suggestion_level).cls}`}>
+                                  <span className="font-semibold">就医建议</span>
+                                  <span>{mapSuggestionLevel(m.meta.suggestion_level).text}</span>
+                                </div>
+                              )}
+
+                              {Array.isArray(m.meta.recommended_doctors) && m.meta.recommended_doctors.length > 0 && (
+                                <div>
+                                  <div className="text-xs font-semibold text-slate-800 mb-2">推荐医生</div>
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                    {m.meta.recommended_doctors.map((d, i) => (
+                                      <button
+                                        key={d?.id ?? i}
+                                        type="button"
+                                        onClick={() => {
+                                          if (d?.id) navigate(`/doctors/${d.id}`);
+                                        }}
+                                        className="text-left p-3 rounded-2xl border border-slate-200 hover:border-cyan-200 hover:shadow-md transition bg-white"
+                                      >
+                                        <div className="flex items-center justify-between gap-2">
+                                          <div className="font-semibold text-slate-900 truncate">{d?.name || '医生'}</div>
+                                          {d?.next_available_time && (
+                                            <div className="text-[11px] text-slate-500 flex-shrink-0">{d.next_available_time}</div>
+                                          )}
+                                        </div>
+                                        <div className="mt-1 text-xs text-slate-600 truncate">
+                                          {(d?.department_name ? `${d.department_name}` : '')}{d?.title ? ` · ${d.title}` : ''}
+                                        </div>
+                                        {d?.good_at && (
+                                          <div className="mt-2 text-xs text-slate-500 line-clamp-2">擅长：{d.good_at}</div>
+                                        )}
+                                        <div className="mt-2 text-[11px] text-slate-400">查看医生详情</div>
+                                      </button>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+
                       </div>
 
+                      {isUser && (
+                        <div className="w-9 h-9 rounded-2xl bg-slate-900 text-white flex items-center justify-center shadow flex-shrink-0">
+                          我
+                        </div>
+                      )}
                     </div>
-
-                    {isUser && (
-                      <div className="w-9 h-9 rounded-2xl bg-slate-900 text-white flex items-center justify-center shadow flex-shrink-0">
-                        我
-                      </div>
-                    )}
-                  </div>
-                </React.Fragment>
-              );
-            })}
+                  </React.Fragment>
+                );
+              })}
+            </div>
           </div>
         </div>
       </div>
+
+      {/* 由于聊天框 fixed，给页面留一个占位高度（避免某些浏览器出现跳动/可选） */}
+      <div className="h-[calc(100vh-12rem)]" />
 
       {/* 固定在底部的输入框 */}
       <div className="fixed bottom-0 left-0 right-0 z-20 px-3 sm:px-4 pb-4 pt-3">
