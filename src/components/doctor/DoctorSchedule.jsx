@@ -39,16 +39,16 @@ const DoctorSchedule = () => {
                     console.log('当前用户是管理员医生');
                 }
             }
-            
+
             // 如果 localStorage 没有，从后端获取
             if (!isAdminDoctor) {
                 const doctorData = await doctorApi.getDoctorMe();
                 console.log('医生完整数据:', doctorData);
-                
+
                 if (doctorData && (doctorData.is_admin === true || doctorData.is_admin === 1)) {
                     setIsAdminDoctor(true);
                     console.log('从后端检测到管理员医生');
-                    
+
                     // 更新 localStorage
                     if (userStr) {
                         const user = JSON.parse(userStr);
@@ -179,10 +179,7 @@ const DoctorSchedule = () => {
             setError('缺少医院信息');
             return;
         }
-        if (selectedDoctors.length === 0) {
-            setError('请至少选择一位医生');
-            return;
-        }
+
         setSaving(true);
         setError('');
         setSuccess('');
@@ -277,7 +274,7 @@ const DoctorSchedule = () => {
                 </div>
 
                 <div className="grid grid-cols-7 text-xs text-slate-500">
-                    {['日','一','二','三','四','五','六'].map(w => (
+                    {['日', '一', '二', '三', '四', '五', '六'].map(w => (
                         <div key={w} className="py-2 text-center font-medium">{w}</div>
                     ))}
                 </div>
@@ -291,9 +288,8 @@ const DoctorSchedule = () => {
                             <button
                                 key={key}
                                 onClick={() => handleSelectDay(d)}
-                                className={`h-16 w-full rounded-lg border text-left p-2 transition ${
-                                    selectedDate === key ? 'border-blue-500 bg-blue-50' : 'border-slate-200 hover:border-blue-300'
-                                }`}
+                                className={`h-16 w-full rounded-lg border text-left p-2 transition ${selectedDate === key ? 'border-blue-500 bg-blue-50' : 'border-slate-200 hover:border-blue-300'
+                                    }`}
                             >
                                 <div className="flex items-center justify-between text-slate-700">
                                     <span className="font-semibold">{d.getDate()}</span>
