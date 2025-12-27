@@ -118,7 +118,7 @@ const HospitalsPage = ({ navigateTo }) => {
     const [searchKeyword, setSearchKeyword] = useState('');
 
     // 筛选医院（加名称搜索）
-    const filteredHospitals = hospitals.filter(h => {
+    let filteredHospitals = hospitals.filter(h => {
         // 名称搜索优先
         if (searchKeyword.trim() && h.name) {
             if (!h.name.toLowerCase().includes(searchKeyword.trim().toLowerCase())) return false;
@@ -127,6 +127,10 @@ const HospitalsPage = ({ navigateTo }) => {
         if (filter === 'frequent') return true;
         return true;
     });
+    // 距离最近和大家常去都只显示前三个
+    if (filter === 'near' || filter === 'frequent') {
+        filteredHospitals = filteredHospitals.slice(0, 3);
+    }
 
 
 
@@ -184,12 +188,23 @@ const HospitalsPage = ({ navigateTo }) => {
             {/* 医院列表 - 一排三个 */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {filteredHospitals.map(hospital => (
-                    <div key={hospital.id} className="bg-white rounded-xl overflow-hidden shadow-sm border border-slate-100 group hover:shadow-md transition">
+                    <div key={hospital.id} className="bg-white rounded-xl overflow-hidden shadow-sm border border-slate-100 group hover:shadow-md transition flex flex-col">
                         <div className="h-48 bg-slate-200 relative">
                             <img src={hospital.image} alt={hospital.name} className="w-full h-full object-cover" />
+                            {(filter === 'near' || filter === 'frequent') && (
+                                <div className="absolute top-2 right-2 z-10">
+                                    <span className="bg-cyan-500 text-white text-xs rounded-full px-3 py-1 font-bold shadow-md select-none">{`TOP ${filteredHospitals.indexOf(hospital) + 1}`}</span>
+                                </div>
+                            )}
                         </div>
-                        <div className="p-4 flex flex-col gap-3">
-                            <div>
+                        {/*
+                          让“查看详情”按钮始终在卡片底部：
+                          - 外层用 flex-col
+                          - 信息区用 flex-1 撑满
+                          - 按钮 mt-auto 自动顶到最底部
+                        */}
+                        <div className="p-4 flex flex-col gap-3 flex-1">
+                            <div className="flex-1">
                                 <div className="flex items-center justify-between gap-2">
                                     <h3 className="font-bold text-lg text-slate-800 truncate">{hospital.name}</h3>
                                     <button
@@ -200,18 +215,20 @@ const HospitalsPage = ({ navigateTo }) => {
                                         <Navigation size={16} />
                                     </button>
                                 </div>
+                                {/* 距离信息已移除，仅右上角显示 */}
                                 <div className="flex items-center gap-2 text-sm text-slate-500 mt-1">
                                     <Phone size={14} className="flex-shrink-0" />
                                     <span>{hospital.phone || '暂无联系电话'}</span>
                                 </div>
                                 <div className="flex items-start gap-2 text-sm text-slate-500 mt-1">
                                     <MapPin size={14} className="mt-0.5 flex-shrink-0" />
-                                    <p className="break-words">{hospital.address}</p>
+                                    {/* 地址最多显示两行，避免卡片高度不一致导致按钮不齐 */}
+                                    <p className="break-words line-clamp-2">{hospital.address}</p>
                                 </div>
                             </div>
 
                             <button
-                                className="mt-2 w-full py-2 bg-cyan-50 text-cyan-600 hover:bg-cyan-100 text-sm font-medium rounded-lg flex items-center justify-center gap-1 transition-colors"
+                                className="mt-auto pt-1 w-full py-2 bg-cyan-50 text-cyan-600 hover:bg-cyan-100 text-sm font-medium rounded-lg flex items-center justify-center gap-1 transition-colors"
                                 onClick={() => navigateTo('hospitalDetail', { hospitalId: hospital.id })}
                             >
                                 查看详情 <ChevronRight size={14} />

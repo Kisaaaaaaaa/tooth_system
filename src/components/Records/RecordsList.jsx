@@ -1,4 +1,8 @@
 import React, { useEffect, useState } from 'react';
+import DatePicker, { registerLocale } from 'react-datepicker';
+import zhCN from 'date-fns/locale/zh-CN';
+import 'react-datepicker/dist/react-datepicker.css';
+registerLocale('zh-CN', zhCN);
 import recordsApi from '../../api/records';
 import { FileText, Star } from 'lucide-react';
 
@@ -55,18 +59,38 @@ const RecordsList = ({ onSelect, onRefresh }) => {
 
                     <div className="flex items-center gap-2 text-sm">
                         <span className="text-slate-500">时间：</span>
-                        <input
-                            type="date"
-                            className="border rounded px-2 py-1"
-                            value={dateFrom}
-                            onChange={e => setDateFrom(e.target.value)}
+                        <DatePicker
+                            selected={dateFrom ? new Date(dateFrom) : null}
+                            onChange={date => setDateFrom(date ? date.toISOString().slice(0, 10) : '')}
+                            dateFormat="yyyy年MM月dd日"
+                            locale="zh-CN"
+                            placeholderText="选择起始日期"
+                            className="border rounded px-2 py-1 w-36"
+                            isClearable
+                            renderCustomHeader={({ date, decreaseMonth, increaseMonth, prevMonthButtonDisabled, nextMonthButtonDisabled }) => (
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, fontWeight: 'bold', fontSize: 18 }}>
+                                    <button onClick={decreaseMonth} disabled={prevMonthButtonDisabled} style={{ fontSize: 18, padding: '0 8px', background: 'none', border: 'none', cursor: 'pointer' }}>{'<'}</button>
+                                    <span>{date.getFullYear()}年 {date.getMonth() + 1}月</span>
+                                    <button onClick={increaseMonth} disabled={nextMonthButtonDisabled} style={{ fontSize: 18, padding: '0 8px', background: 'none', border: 'none', cursor: 'pointer' }}>{'>'}</button>
+                                </div>
+                            )}
                         />
                         <span className="text-slate-400">至</span>
-                        <input
-                            type="date"
-                            className="border rounded px-2 py-1"
-                            value={dateTo}
-                            onChange={e => setDateTo(e.target.value)}
+                        <DatePicker
+                            selected={dateTo ? new Date(dateTo) : null}
+                            onChange={date => setDateTo(date ? date.toISOString().slice(0, 10) : '')}
+                            dateFormat="yyyy年MM月dd日"
+                            locale="zh-CN"
+                            placeholderText="选择结束日期"
+                            className="border rounded px-2 py-1 w-36"
+                            isClearable
+                            renderCustomHeader={({ date, decreaseMonth, increaseMonth, prevMonthButtonDisabled, nextMonthButtonDisabled }) => (
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, fontWeight: 'bold', fontSize: 18 }}>
+                                    <button onClick={decreaseMonth} disabled={prevMonthButtonDisabled} style={{ fontSize: 18, padding: '0 8px', background: 'none', border: 'none', cursor: 'pointer' }}>{'<'}</button>
+                                    <span>{date.getFullYear()}年 {date.getMonth() + 1}月</span>
+                                    <button onClick={increaseMonth} disabled={nextMonthButtonDisabled} style={{ fontSize: 18, padding: '0 8px', background: 'none', border: 'none', cursor: 'pointer' }}>{'>'}</button>
+                                </div>
+                            )}
                         />
                         <button
                             onClick={() => {
