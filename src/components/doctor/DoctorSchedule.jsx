@@ -93,7 +93,12 @@ const DoctorSchedule = () => {
             setScheduleLoading(true);
             const start = new Date(dateObj.getFullYear(), dateObj.getMonth(), 1);
             const end = new Date(dateObj.getFullYear(), dateObj.getMonth() + 1, 0);
-            const fmt = (d) => d.toISOString().slice(0, 10);
+            const fmt = (d) => {
+                const y = d.getFullYear();
+                const m = String(d.getMonth() + 1).padStart(2, '0');
+                const day = String(d.getDate()).padStart(2, '0');
+                return `${y}-${m}-${day}`;
+            };
 
             const res = await doctorApi.getSchedules({
                 hospital_id: hospitalId,
