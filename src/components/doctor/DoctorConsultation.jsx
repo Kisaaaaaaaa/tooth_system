@@ -7,8 +7,9 @@ import consultationApi from '../../api/consultation';
  * 医生可以查看患者列表,进行在线咨询，发送和接收消息
  */
 const DoctorConsultation = () => {
-    const STORAGE_KEY = 'doctor_consult_selected_session_id';
+    // const STORAGE_KEY = 'doctor_consult_selected_session_id';
     const [sessions, setSessions] = useState([]);
+    // 默认不选中任何会话
     const [selectedSession, setSelectedSession] = useState(null);
     const [messages, setMessages] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -59,23 +60,8 @@ const DoctorConsultation = () => {
     };
 
     useEffect(() => {
-        // 加载会话列表
+        // 只加载会话列表，不自动恢复上次会话
         fetchConsultationSessions();
-        // 尝试恢复上次选中的会话
-        try {
-            const savedId = localStorage.getItem(STORAGE_KEY);
-            if (savedId) {
-                const sid = Number(savedId);
-                if (!Number.isNaN(sid)) {
-                    fetchSessionDetail(sid).catch(() => {
-                        // 无法恢复则清理存储
-                        localStorage.removeItem(STORAGE_KEY);
-                    });
-                }
-            }
-        } catch (e) {
-            // ignore
-        }
     }, []);
 
     // 滚动到底部
@@ -223,12 +209,6 @@ const DoctorConsultation = () => {
     const handleSelectSession = (session) => {
         setSelectedSession(session);
         fetchSessionDetail(session.id);
-        // 持久化选中会话ID，刷新后自动恢复
-        try {
-            localStorage.setItem(STORAGE_KEY, String(session.id));
-        } catch (e) {
-            // ignore storage errors
-        }
     };
 
     // 发送消息
@@ -286,7 +266,7 @@ const DoctorConsultation = () => {
                 setMessages([]);
                 fetchConsultationSessions();
                 // 关闭后清理持久化的会话ID
-                try { localStorage.removeItem(STORAGE_KEY); } catch (e) {}
+                try { localStorage.removeItem(STORAGE_KEY); } catch (e) { }
             }
         } catch (err) {
             console.error('关闭会话失败:', err);
@@ -400,8 +380,8 @@ const DoctorConsultation = () => {
                                                 </div>
                                                 <div className="mt-1">
                                                     <span className={`text-xs px-2 py-0.5 rounded-full ${session.status === 'active'
-                                                            ? 'bg-green-100 text-green-700'
-                                                            : 'bg-slate-100 text-slate-600'
+                                                        ? 'bg-green-100 text-green-700'
+                                                        : 'bg-slate-100 text-slate-600'
                                                         }`}>
                                                         {session.status === 'active' ? '进行中' : '已结束'}
                                                     </span>
@@ -516,14 +496,14 @@ const DoctorConsultation = () => {
                                                         <div
                                                             key={idx}
                                                             className={`flex ${msg.role === 'doctor' || msg.sender === 'doctor'
-                                                                    ? 'justify-end'
-                                                                    : 'justify-start'
+                                                                ? 'justify-end'
+                                                                : 'justify-start'
                                                                 }`}
                                                         >
                                                             <div
                                                                 className={`max-w-[80%] p-3 rounded-2xl text-sm ${msg.role === 'doctor' || msg.sender === 'doctor'
-                                                                        ? 'bg-cyan-500 text-white rounded-tr-none'
-                                                                        : 'bg-white border border-slate-200 text-slate-700 rounded-tl-none'
+                                                                    ? 'bg-cyan-500 text-white rounded-tr-none'
+                                                                    : 'bg-white border border-slate-200 text-slate-700 rounded-tl-none'
                                                                     }`}
                                                             >
                                                                 {msg.content || msg.text || '（空消息）'}
