@@ -127,10 +127,7 @@ const HospitalsPage = ({ navigateTo }) => {
         if (filter === 'frequent') return true;
         return true;
     });
-    // 距离最近和大家常去都只显示前三个
-    if (filter === 'near' || filter === 'frequent') {
-        filteredHospitals = filteredHospitals.slice(0, 3);
-    }
+    // 距离最近和大家常去：列表仍显示全部，但只给前三个展示 TOP 标签
 
 
 
@@ -187,13 +184,13 @@ const HospitalsPage = ({ navigateTo }) => {
 
             {/* 医院列表 - 一排三个 */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {filteredHospitals.map(hospital => (
+                {filteredHospitals.map((hospital, idx) => (
                     <div key={hospital.id} className="bg-white rounded-xl overflow-hidden shadow-sm border border-slate-100 group hover:shadow-md transition flex flex-col">
                         <div className="h-48 bg-slate-200 relative">
                             <img src={hospital.image} alt={hospital.name} className="w-full h-full object-cover" />
-                            {(filter === 'near' || filter === 'frequent') && (
+                            {(filter === 'near' || filter === 'frequent') && idx < 3 && (
                                 <div className="absolute top-2 right-2 z-10">
-                                    <span className="bg-cyan-500 text-white text-xs rounded-full px-3 py-1 font-bold shadow-md select-none">{`TOP ${filteredHospitals.indexOf(hospital) + 1}`}</span>
+                                    <span className="bg-cyan-500 text-white text-xs rounded-full px-3 py-1 font-bold shadow-md select-none">{`TOP ${idx + 1}`}</span>
                                 </div>
                             )}
                         </div>

@@ -7,14 +7,8 @@ const HistorySidebar = ({
     onOpenSearch,
 }) => {
     return (
-        <div className="hidden md:block fixed left-0 top-0 bottom-0 w-72 bg-white border-r border-slate-200 overflow-auto">
-            <div className="pt-4 pb-2 px-3">
-                <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-xl">🦷</div>
-                    <div className="text-sm font-medium text-slate-700">AI 问询</div>
-                </div>
-            </div>
-            <div className="px-3">
+        <div className="hidden md:block fixed left-0 top-16 bottom-0 w-72 bg-white border-r border-slate-200 overflow-auto">
+            <div className="px-3 pt-4">
                 {/* 顶部动作 */}
                 <div className="px-2 pb-2 space-y-2">
                     <button
