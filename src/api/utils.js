@@ -54,9 +54,12 @@ export async function uploadImage(formData) {
   }
 
   const token = localStorage.getItem('authToken') || localStorage.getItem('access_token');
-  const headers = {};
+  
+  // 创建 Headers 对象（按照指定格式）
+  const myHeaders = new Headers();
+  myHeaders.append("Accept", "application/json");
   if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
+    myHeaders.append("Authorization", `Bearer ${token}`);
   }
 
   // 正确的后端路径是 /api/upload/image/
@@ -66,7 +69,7 @@ export async function uploadImage(formData) {
 
   const response = await fetch(uploadUrl, {
     method: 'POST',
-    headers,
+    headers: myHeaders,
     body: formData,
   });
 
@@ -86,9 +89,34 @@ export async function uploadImage(formData) {
     console.error('业务错误，code:', result.code, 'message:', result.message);
     throw new Error(result.message || '上传失败');
   }
-  
-  // 返回整个 data 对象，包含 url
-  return result.data || result;
+
+  // 统一返回 { url } 结构，保持与用户端一致
+  const data = result.data || result;
+
+  // 尝试从多种结构里提取 url
+  const pickUrl = (item) => item?.url || item?.path || item?.image || item?.file || (typeof item === 'string' ? item : null);
+
+  let rawUrl = pickUrl(data);
+
+  // 如果返回数组，取第一项的 url
+  if (!rawUrl && Array.isArray(data) && data.length) {
+    rawUrl = pickUrl(data[0]);
+  }
+
+  // 如果 message 字符串里包含 http 链接，也尝试提取
+  if (!rawUrl && typeof result.message === 'string') {
+    const match = result.message.match(/https?:[^'"\s]+/i);
+    rawUrl = match ? match[0] : null;
+  }
+
+  if (!rawUrl) {
+    console.error('上传返回未找到 url 字段，data:', data);
+    throw new Error('上传返回格式错误，缺少 url');
+  }
+
+  // 规范为完整可访问的 URL，保持与用户端一致
+  const normalizedUrl = resolveMediaUrl(rawUrl);
+  return { url: normalizedUrl };
 }
 
 export default { buildQuery, resolveMediaUrl, uploadImage };

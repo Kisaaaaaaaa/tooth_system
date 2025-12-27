@@ -153,16 +153,9 @@ const Register = ({ navigateTo }) => {
             localStorage.removeItem('guest');
             navigateTo('');
         } catch (err) {
-            const msg = (err && err.message) ? err.message : JSON.stringify(err);
-            // 如果后端提示手机号已存在，前端直接进入医生申请步骤，不再显示错误
-            const existsPatterns = ['已存在', '手机号', 'UNIQUE', 'unique'];
-            const hitExists = existsPatterns.some(p => String(msg).includes(p));
-            if (role === 'doctor' && hitExists) {
-                setError('');
-                setStep('doctorApply');
-                return;
-            }
-            setError(msg || '注册失败');
+            // 所有错误都直接提示，不再自动跳转医生申请
+            const rawMsg = err?.message || '';
+            setError(rawMsg || '注册失败');
         }
     };
 
@@ -187,38 +180,31 @@ const Register = ({ navigateTo }) => {
         setError('');
         setUploadingAvatar(true);
         try {
-            const tokenPresent = !!(localStorage.getItem('access_token') || localStorage.getItem('authToken'));
-            if (tokenPresent) {
-                const formData = new FormData();
-                formData.append('file', file);
-                console.log('开始上传图片，文件名:', file.name, '大小:', file.size, '类型:', file.type);
-                const res = await uploadImage(formData);
-                console.log('上传响应:', res);
-                
-                // 后端返回 { url: "..." }
-                if (res && res.url) {
-                    setDoctorAvatar(res.url);
-                    console.log('头像设置成功(服务端URL):', res.url);
-                } else {
-                    console.error('上传返回格式错误，响应:', res);
-                    throw new Error('上传返回格式错误');
+            // 无论是否登录，都直接上传到服务器获取 http/https URL
+            // 创建 FormData 对象
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('update_avatar', 'false'); // 不更新用户头像，只获取URL
+            
+            console.log('开始上传图片，文件名:', file.name, '大小:', file.size, '类型:', file.type);
+            const res = await uploadImage(formData);
+            console.log('上传响应:', res);
+            
+            // 后端返回 { url: "..." }
+            const uploadUrl = res?.url || res?.data?.url;
+            if (uploadUrl) {
+                // 验证 URL 格式和长度
+                if (!/^https?:\/\//i.test(uploadUrl)) {
+                    throw new Error('上传返回的 URL 格式无效，需要 http/https');
                 }
+                if (uploadUrl.length > 200) {
+                    throw new Error('上传返回的 URL 长度超过 200 字符');
+                }
+                setDoctorAvatar(uploadUrl);
+                console.log('头像设置成功(服务端URL):', uploadUrl);
             } else {
-                // 未登录：直接在本地读取为 data URL，用于预览与提交（后端存文本）
-                const reader = new FileReader();
-                reader.onload = () => {
-                    const dataUrl = reader.result;
-                    setDoctorAvatar(String(dataUrl));
-                    console.log('头像设置成功(本地dataURL):', String(dataUrl).slice(0, 64) + '...');
-                    setUploadingAvatar(false);
-                };
-                reader.onerror = (ev) => {
-                    console.error('本地读取图片失败:', ev);
-                    setError('本地读取图片失败');
-                    setUploadingAvatar(false);
-                };
-                reader.readAsDataURL(file);
-                return;
+                console.error('上传返回格式错误，响应:', res);
+                throw new Error('上传返回格式错误，缺少 url');
             }
         } catch (err) {
             console.error('上传头像失败，错误详情:', err);
@@ -233,12 +219,21 @@ const Register = ({ navigateTo }) => {
         setError('');
         setApplySubmitting(true);
         try {
-            // 仅当头像为有效的 http/https URL 且长度不超过200时才随申请提交
+            // 验证头像 URL：必须是 http/https 且长度不超过 200
             const isHttpUrl = (u) => typeof u === 'string' && /^https?:\/\//i.test(u);
-            const avatarValid = isHttpUrl(doctorAvatar) && doctorAvatar.length <= 200 ? doctorAvatar : undefined;
+            
+            const avatarValid = (() => {
+                if (!doctorAvatar) return undefined;
+                if (isHttpUrl(doctorAvatar) && doctorAvatar.length <= 200) {
+                    return doctorAvatar;
+                }
+                return undefined;
+            })();
+            
             if (!avatarValid && doctorAvatar) {
-                console.warn('头像非有效URL或长度超限，已在申请中忽略');
+                console.warn('头像地址无效或超长，已忽略提交（需 http/https 且长度 ≤200）');
             }
+            
             const res = await applyDoctor({
                 name,
                 title: doctorTitle,
@@ -379,12 +374,6 @@ const Register = ({ navigateTo }) => {
                                 onChange={e=>setDoctorAvatar(e.target.value)} 
                                 placeholder="https://example.com/avatar.jpg"
                             />
-                            <div className="text-xs text-amber-600 mt-1 flex items-start gap-1">
-                                <svg className="w-4 h-4 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
-                                    <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                                </svg>
-                                <span>未登录暂不保存头像，可先提交资料后登录补充头像</span>
-                            </div>
                         </div>
 
                         {/* 使用两列布局优化空间 */}

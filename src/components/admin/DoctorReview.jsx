@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from 'react';
+import { X, Phone, Mail, Briefcase, Award, MapPin } from 'lucide-react';
 import adminApi from '../../api/admin';
+import doctorApi from '../../api/doctors';
 import { resolveMediaUrl } from '../../api/utils';
 
 const DoctorReview = () => {
@@ -12,6 +14,8 @@ const DoctorReview = () => {
   const [rejectModal, setRejectModal] = useState(null); // { id, doctorName }
   const [rejectReason, setRejectReason] = useState('');
   const [hospitalsMap, setHospitalsMap] = useState({});
+  const [detailModal, setDetailModal] = useState(null); // { id, doctor }
+  const [detailLoading, setDetailLoading] = useState(false);
 
   // 获取待审核和已通过的医生列表
   const fetchDoctorData = async () => {
@@ -207,6 +211,27 @@ const DoctorReview = () => {
     }
   };
 
+  // 获取医生详细信息
+  const fetchDoctorDetail = async (id) => {
+    setDetailLoading(true);
+    try {
+      const result = await doctorApi.getDoctorDetail(id);
+      console.log('医生详细信息:', result);
+      const doctorData = result?.data || result;
+      setDetailModal({ id, doctor: doctorData });
+    } catch (err) {
+      console.error('Error fetching doctor detail:', err);
+      setError('获取医生详细信息失败');
+    } finally {
+      setDetailLoading(false);
+    }
+  };
+
+  // 打开医生详细信息弹窗
+  const openDoctorDetail = (doctorId) => {
+    fetchDoctorDetail(doctorId);
+  };
+
   if (loading) {
     return <div className="flex justify-center items-center h-64">加载中...</div>;
   }
@@ -237,7 +262,7 @@ const DoctorReview = () => {
             </div>
           ) : (
             pending.map(d => (
-              <div key={d.id} className="p-3 border rounded-lg bg-slate-50 flex items-start gap-3 hover:shadow-sm transition-shadow">
+              <div key={d.id} className="p-3 border rounded-lg bg-slate-50 flex items-start gap-3 hover:shadow-md transition-all cursor-pointer hover:border-cyan-300" onClick={() => openDoctorDetail(d.id)}>
                 <div className="flex-shrink-0">
                   <img 
                     src={resolveMediaUrl(d.avatar)} 
@@ -266,7 +291,10 @@ const DoctorReview = () => {
                 </div>
                 <div className="flex flex-col gap-2 ml-2">
                   <button 
-                    onClick={() => approve(d.id)} 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      approve(d.id);
+                    }} 
                     disabled={operating === d.id}
                     className={`px-4 py-2 rounded-lg text-sm transition-colors ${
                       operating === d.id 
@@ -277,7 +305,10 @@ const DoctorReview = () => {
                     {operating === d.id ? '处理中...' : '通过'}
                   </button>
                   <button 
-                    onClick={() => openRejectModal(d.id, d.name)} 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openRejectModal(d.id, d.name);
+                    }} 
                     disabled={operating === d.id}
                     className={`px-4 py-2 rounded-lg text-sm transition-colors ${
                       operating === d.id 
@@ -304,7 +335,7 @@ const DoctorReview = () => {
             </div>
           ) : (
             approved.map(d => (
-              <div key={d.id} className="p-3 border rounded-lg bg-slate-50 flex items-start gap-3 hover:shadow-sm transition-shadow">
+              <div key={d.id} className="p-3 border rounded-lg bg-slate-50 flex items-start gap-3 hover:shadow-md transition-all cursor-pointer hover:border-cyan-300" onClick={() => openDoctorDetail(d.id)}>
                 <div className="flex-shrink-0">
                   <img 
                     src={resolveMediaUrl(d.avatar)} 
@@ -392,6 +423,160 @@ const DoctorReview = () => {
                 className="flex-1 px-4 py-2 rounded-lg bg-rose-600 text-white hover:bg-rose-700 transition disabled:bg-rose-400"
               >
                 {operating === rejectModal.id ? '处理中...' : '确认拒绝'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 医生详细信息弹窗 */}
+      {detailModal && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            {/* 头部 */}
+            <div className="sticky top-0 bg-white flex items-center justify-between p-6 border-b">
+              <h3 className="text-xl font-semibold">医生详细信息</h3>
+              <button
+                onClick={() => setDetailModal(null)}
+                className="p-1 hover:bg-slate-100 rounded-lg transition"
+              >
+                <X size={24} className="text-slate-400" />
+              </button>
+            </div>
+
+            {/* 内容 */}
+            {detailLoading ? (
+              <div className="p-8 text-center text-slate-400">
+                <div className="text-lg mb-2">加载中...</div>
+              </div>
+            ) : detailModal.doctor ? (
+              <div className="p-6 space-y-6">
+                {/* 基本信息卡片 */}
+                <div className="bg-gradient-to-r from-cyan-50 to-blue-50 rounded-lg p-6 flex gap-4">
+                  <img
+                    src={resolveMediaUrl(detailModal.doctor.avatar)}
+                    alt={detailModal.doctor.name}
+                    className="w-24 h-24 rounded-full object-cover border-4 border-white shadow-lg"
+                    onError={(e) => { e.currentTarget.src = '/images/avatar-fallback.svg'; }}
+                  />
+                  <div className="flex-grow">
+                    <div className="flex items-center gap-2 mb-2">
+                      <h4 className="text-2xl font-bold text-slate-800">{detailModal.doctor.name}</h4>
+                      {detailModal.doctor.is_admin && (
+                        <span className="px-2 py-1 bg-purple-100 text-purple-800 rounded-full text-xs font-medium">管理员</span>
+                      )}
+                    </div>
+                    <div className="flex gap-4 text-sm text-slate-600 mb-2">
+                      <span className="px-2 py-1 bg-cyan-100 text-cyan-800 rounded">{detailModal.doctor.title || '医师'}</span>
+                      <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded">{detailModal.doctor.specialty || '全科'}</span>
+                    </div>
+                    {detailModal.doctor.hospital_name && (
+                      <div className="text-sm text-slate-600 flex items-center gap-1">
+                        <MapPin size={14} className="flex-shrink-0" />
+                        {detailModal.doctor.hospital_name}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* 联系信息 */}
+                <div className="space-y-3">
+                  <h5 className="font-semibold text-slate-800">联系信息</h5>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {detailModal.doctor.user?.phone && (
+                      <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg">
+                        <Phone size={18} className="text-cyan-600 flex-shrink-0" />
+                        <div>
+                          <div className="text-xs text-slate-500">电话</div>
+                          <div className="text-sm font-medium text-slate-800">{detailModal.doctor.user.phone}</div>
+                        </div>
+                      </div>
+                    )}
+                    {detailModal.doctor.user?.email && (
+                      <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg">
+                        <Mail size={18} className="text-cyan-600 flex-shrink-0" />
+                        <div>
+                          <div className="text-xs text-slate-500">邮箱</div>
+                          <div className="text-sm font-medium text-slate-800">{detailModal.doctor.user.email}</div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* 职业信息 */}
+                <div className="space-y-3">
+                  <h5 className="font-semibold text-slate-800">职业信息</h5>
+                  <div className="space-y-3">
+                    {detailModal.doctor.title && (
+                      <div className="flex items-start gap-3">
+                        <Award size={18} className="text-cyan-600 flex-shrink-0 mt-1" />
+                        <div>
+                          <div className="text-sm text-slate-600">职称</div>
+                          <div className="font-medium text-slate-800">{detailModal.doctor.title}</div>
+                        </div>
+                      </div>
+                    )}
+                    {detailModal.doctor.specialty && (
+                      <div className="flex items-start gap-3">
+                        <Briefcase size={18} className="text-cyan-600 flex-shrink-0 mt-1" />
+                        <div>
+                          <div className="text-sm text-slate-600">专长</div>
+                          <div className="font-medium text-slate-800">{detailModal.doctor.specialty}</div>
+                        </div>
+                      </div>
+                    )}
+                    {detailModal.doctor.introduction && (
+                      <div className="flex items-start gap-3">
+                        <div>
+                          <div className="text-sm text-slate-600">简介</div>
+                          <div className="font-medium text-slate-800">{detailModal.doctor.introduction}</div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* 资质信息 */}
+                {(detailModal.doctor.license_number || detailModal.doctor.qualification || detailModal.doctor.experience_years) && (
+                  <div className="space-y-3 border-t pt-4">
+                    <h5 className="font-semibold text-slate-800">资质信息</h5>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {detailModal.doctor.license_number && (
+                        <div className="p-3 bg-slate-50 rounded-lg">
+                          <div className="text-xs text-slate-500">执业证号</div>
+                          <div className="text-sm font-medium text-slate-800">{detailModal.doctor.license_number}</div>
+                        </div>
+                      )}
+                      {detailModal.doctor.qualification && (
+                        <div className="p-3 bg-slate-50 rounded-lg">
+                          <div className="text-xs text-slate-500">学历</div>
+                          <div className="text-sm font-medium text-slate-800">{detailModal.doctor.qualification}</div>
+                        </div>
+                      )}
+                      {detailModal.doctor.experience_years && (
+                        <div className="p-3 bg-slate-50 rounded-lg">
+                          <div className="text-xs text-slate-500">从业年限</div>
+                          <div className="text-sm font-medium text-slate-800">{detailModal.doctor.experience_years}年</div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="p-8 text-center text-slate-400">
+                <div className="text-lg">无法加载医生信息</div>
+              </div>
+            )}
+
+            {/* 关闭按钮 */}
+            <div className="border-t p-6 bg-slate-50 flex justify-end">
+              <button
+                onClick={() => setDetailModal(null)}
+                className="px-6 py-2 rounded-lg bg-slate-300 text-slate-700 hover:bg-slate-400 transition"
+              >
+                关闭
               </button>
             </div>
           </div>
