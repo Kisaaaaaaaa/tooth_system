@@ -20,9 +20,6 @@ const AiInquiryPage = () => {
   const [gender, setGender] = useState('');
   const [hasAllergy, setHasAllergy] = useState(false);
 
-  const [sessionMessages, setSessionMessages] = useState([]);
-  const [sessionId, setSessionId] = useState(() => Date.now().toString(36));
-
   const [history, setHistory] = useState([]);
   const [baseHistory, setBaseHistory] = useState([]);
   const [searchModalOpen, setSearchModalOpen] = useState(false);
@@ -30,6 +27,24 @@ const AiInquiryPage = () => {
   const fileInputRef = useRef(null);
   const scrollRef = useRef(null);
   const [highlightMessageId, setHighlightMessageId] = useState(null);
+
+  // 把后端“逐条历史消息”映射成当前聊天窗口可渲染的 messages
+  const mapHistoryResultsToMessages = (results = []) => {
+    const items = Array.isArray(results) ? results.slice() : [];
+    // 保证按时间升序，聊天窗口从上到下自然阅读
+    items.sort((a, b) => {
+      const ta = Date.parse(a?.created_at || '') || 0;
+      const tb = Date.parse(b?.created_at || '') || 0;
+      return ta - tb;
+    });
+    return items.map((m) => ({
+      role: m?.role === 'assistant' ? 'assistant' : 'user',
+      text: m?.content ?? '',
+      created_at: m?.created_at,
+      ts: Date.parse(m?.created_at || '') || undefined,
+      _messageId: m?.id,
+    }));
+  };
 
   const formatTime = (ts) => {
     if (!ts) return '';
@@ -51,10 +66,19 @@ const AiInquiryPage = () => {
           : [];
         setHistory(grouped);
         setBaseHistory(grouped);
+
+        // 新需求：不再区分新建会话/历史会话，进入页面直接展示全部历史
+        const mapped = mapHistoryResultsToMessages(Array.isArray(results) ? results : []);
+        setMessages(mapped);
+        // 滚到底部
+        setTimeout(() => {
+          if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+        }, 60);
       } catch (e) {
         console.error('获取历史记录失败:', e);
         setHistory([]);
         setBaseHistory([]);
+        setMessages([]);
       }
     };
 
@@ -124,7 +148,6 @@ const AiInquiryPage = () => {
 
   const pushMessage = (msg) => {
     setMessages((m) => [...m, msg]);
-    setSessionMessages((s) => [...s, msg]);
   };
 
   const mapSuggestionLevel = (lvl) => {
@@ -158,6 +181,7 @@ const AiInquiryPage = () => {
       files: effectiveUploads.length
         ? effectiveUploads.map((f) => ({ name: f.filename || '文件', url: f.url }))
         : undefined,
+      ts: Date.now(),
     };
 
     pushMessage(userMsg);
@@ -187,10 +211,28 @@ const AiInquiryPage = () => {
           suggestion_level: data?.suggestion_level,
           recommended_doctors: Array.isArray(data?.recommended_doctors) ? data.recommended_doctors : [],
         },
+        ts: Date.now(),
       });
 
       // 发送成功后清空待发送附件
       if (effectiveUploads.length) setPendingUploads([]);
+
+      // 轻量“回刷”一次历史（不强依赖；后端若异步落库，可让 UI 稳定跟随后端）
+      // 注意：这里不阻塞 UI，仅用于让刷新后仍能看到完整历史
+      try {
+        const data2 = await aiHistoryApi.getHistoryList({ page: 1, page_size: 200 });
+        const results2 = data2?.results;
+        if (Array.isArray(results2)) {
+          setMessages(mapHistoryResultsToMessages(results2));
+          const grouped2 = aiHistoryApi.groupHistoryMessages
+            ? aiHistoryApi.groupHistoryMessages(results2, { gapMinutes: 20 })
+            : [];
+          setHistory(grouped2);
+          setBaseHistory(grouped2);
+        }
+      } catch (_) {
+        // 忽略回刷失败，保持本地追加的消息
+      }
     } catch (e) {
       setError(e);
       pushMessage({ role: 'assistant', text: '请求失败：' + (e.message || e.status || '') });
@@ -258,26 +300,23 @@ const AiInquiryPage = () => {
   };
 
   const handleSelectHistory = (item) => {
-    // 搜索模式下：如果能拿到 messageId，则走“定位到聊天框”接口
+    // 新需求：聊天窗口始终展示全部历史；侧边栏点击仅做“定位滚动”
     const messageId = item?.messageId || item?.raw?.[0]?.id;
-    if (messageId && aiHistoryApi.getMessageLocation) {
-      openMessageLocation(messageId);
+    if (!messageId) {
+      setTimeout(() => {
+        if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+      }, 50);
       return;
     }
 
-    if (item.messages && Array.isArray(item.messages)) {
-      setMessages(item.messages);
-      setSessionMessages(item.messages);
-      setSessionId(item.id || Date.now().toString(36));
-    } else {
-      const fallback = item.question ? [{ role: 'user', text: item.question }] : [];
-      setMessages(fallback);
-      setSessionMessages(fallback);
-      setSessionId(item.id || Date.now().toString(36));
-    }
     setTimeout(() => {
-      if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-    }, 50);
+      const container = scrollRef.current;
+      if (!container) return;
+      const el = container.querySelector(`[data-message-id="${messageId}"]`);
+      if (el && typeof el.scrollIntoView === 'function') {
+        el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      }
+    }, 80);
   };
 
   const openMessageLocation = async (messageId) => {
@@ -292,8 +331,6 @@ const AiInquiryPage = () => {
         _messageId: m?.id,
       }));
       setMessages(mapped);
-      setSessionMessages(mapped);
-      setSessionId(`loc-${data?.message_id || messageId}`);
       setHighlightMessageId(data?.message_id || Number(messageId));
       // 等渲染后滚动
       setTimeout(() => {
@@ -314,30 +351,11 @@ const AiInquiryPage = () => {
     }
   };
 
-  const endAndSaveSession = () => {
-    if (!sessionMessages || sessionMessages.length === 0) return;
-    const histItem = {
-      id: sessionId || (Date.now() + Math.random().toString(36).slice(2, 8)),
-      preview: sessionMessages.find((m) => m.role === 'user') ? sessionMessages.find((m) => m.role === 'user').text : (sessionMessages[0] && sessionMessages[0].text) || '',
-      messages: sessionMessages,
-      ts: Date.now(),
-    };
-    saveHistoryItem(histItem);
-  };
-
-  const startNewChat = () => {
-    setMessages([]);
-    setSessionMessages([]);
-    setSessionId(Date.now().toString(36));
-    setHighlightMessageId(null);
-  };
-
   return (
     <div className="w-full min-h-screen bg-slate-50 pb-40">
       <HistorySidebar
         history={history}
         onSelect={handleSelectHistory}
-        onNewChat={startNewChat}
         onOpenSearch={() => setSearchModalOpen(true)}
       />
 
@@ -371,11 +389,13 @@ const AiInquiryPage = () => {
               <div className="flex items-center gap-2 flex-shrink-0">
                 <button
                   type="button"
-                  onClick={endAndSaveSession}
-                  disabled={!sessionMessages || sessionMessages.length === 0}
-                  className="text-sm px-3 py-2 rounded-xl bg-slate-900 text-white hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed"
+                  onClick={() => {
+                    setMessages([]);
+                    setHighlightMessageId(null);
+                  }}
+                  className="text-sm px-3 py-2 rounded-xl bg-slate-900 text-white hover:bg-slate-800"
                 >
-                  结束并保存
+                  清空本页
                 </button>
               </div>
             </div>
