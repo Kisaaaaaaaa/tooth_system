@@ -1,175 +1,81 @@
-# 牙科预约管理系统 - 前端项目结构
+# 牙科预约管理系统（前端）
 
-##  项目目录结构
+React + Vite 构建的单页应用，提供预约、问诊、医生日程等牙科业务的用户界面。项目支持桌面端与移动端自适应，集成地图选址、AI 问诊、3D 牙齿模型等功能模块。
 
+## 技术栈
+- React 18 + React Router 7（前端框架与路由）
+- Vite 4（开发与构建工具）
+- Tailwind CSS 3（样式与原子化类）
+- lucide-react（图标库）
+- three.js（3D 场景/牙齿模型）
+- @amap/amap-jsapi-loader（高德地图加载器）
+
+## 功能概览
+- 医院与医生浏览：列表、筛选、排行榜等视图
+- 预约管理：创建、查看、签到/取消等操作
+- 在线问诊：聊天记录与会话展示（AI 问诊入口）
+- 就诊档案：历史记录与分析展示
+- 医生排班：医生个人日程与时间段管理
+- 3D 牙齿模型与地图选址：科技感展示与位置选择
+
+## 快速开始
+1) 安装依赖（Node.js 16+）
+```bash
+npm install
+# 或 pnpm i / yarn
+```
+2) 启动开发服务器
+```bash
+npm run dev
+```
+3) 访问地址
+- 默认本地端口：http://localhost:3000/
+- 若端口被占用，Vite 会自动顺延，请以终端提示为准。
+
+## 可用脚本
+- `npm run dev`：启动开发环境（HMR 热更新）
+- `npm run build`：构建生产包
+- `npm run preview`：本地预览构建产物
+
+## 目录结构（核心）
+```
 牙科预约管理系统/
-├── src/
-│   ├── data/                    # 数据层
-│   │   ├── mockData.js         # 模拟数据（医院、医生、预约、病历等）
-│   │   └── index.js            # 数据统一导出
-│   │
-│   ├── components/              # 组件层
-│   │   ├── common/              # 通用组件
-│   │   │   └── TechToothModel.jsx    # 3D牙齿模型组件
-│   │   │
-│   │   ├── pages/               # 页面组件
-│   │   │   ├── HomePage.jsx           # 首页
-│   │   │   ├── HospitalsPage.jsx      # 医院列表页
-│   │   │   ├── DoctorsPage.jsx        # 医生列表页
-│   │   │   ├── ConsultationPage.jsx    # 在线问诊页
-│   │   │   ├── AppointmentsPage.jsx    # 预约管理页
-│   │   │   ├── RecordsPage.jsx         # 就诊档案页
-│   │   │   └── index.js                # 页面组件统一导出
-│   │   │
-│   │   └── layout/              # 布局组件
-│   │       ├── Navbar.jsx              # 顶部导航栏
-│   │       ├── BottomNav.jsx           # 移动端底部导航
-│   │       └── index.js                # 布局组件统一导出
-│   │
-│   ├── styles/                  # 样式文件
-│   │   └── global.css           # 全局样式和动画
-│   │
-│   └── App.jsx                  # 主应用入口
-│
-└── README.md                    # 项目说明文档
+├─ src/
+│  ├─ api/                # 前后端接口封装（预约、医生、医院、AI 等）
+│  ├─ components/         # 业务组件与页面模块
+│  ├─ data/               # 模拟数据与数据出口
+│  ├─ styles/             # 全局样式（Tailwind + 自定义）
+│  ├─ App.jsx             # 应用入口与路由挂载
+│  └─ main.jsx            # Vite 入口
+├─ public/                # 静态资源（images、models 等）
+├─ package.json           # 项目脚本与依赖
+├─ vite.config.js         # Vite 配置
+├─ tailwind.config.js     # Tailwind 配置
+└─ 运行说明.md            # 运行指引（简版）
 ```
 
-##  模块说明
+### 主要目录说明
+- [src/api](src/api)：REST 请求封装，按业务域划分文件（如 appointments、doctors、records、ai 等）。
+- [src/components](src/components)：功能组件与页面片段，包含医生排班、预约卡片、导航等业务模块。
+- [src/data](src/data)：模拟数据与索引，便于无后端时联调与展示。
+- [src/styles](src/styles)：全局样式与 Tailwind 定制，项目统一的视觉规则入口。
+- [src/App.jsx](src/App.jsx)：应用路由与页面装配。
+- [src/main.jsx](src/main.jsx)：挂载 React 应用、引入全局样式。
+- [public](public)：静态资源目录，部署时会被直接复制。
 
-### 1. 数据层 (data/)
-- **mockData.js**: 集中管理所有模拟数据
-  - `MOCK_HOSPITALS`: 医院数据
-  - `MOCK_DOCTORS`: 医生数据
-  - `MOCK_APPOINTMENTS`: 预约数据
-  - `MOCK_RECORDS`: 就诊记录数据
-  - `MOCK_CHAT_HISTORY`: 聊天历史数据
+## 开发提示
+- Tailwind 已按 Vite 预设接入，可直接在 className 中使用原子类。
+- 修改代码后支持热更新；若样式异常，可重启 `npm run dev`。
+- 若需要地图能力，请在对应组件中配置高德 Key（参照 @amap/amap-jsapi-loader 官方用法）。
+- 构建前可运行 `npm install --registry https://registry.npmmirror.com` 以提升国内安装速度。
 
-### 2. 通用组件 (components/common/)
-- **TechToothModel.jsx**: 3D科技感牙齿模型展示组件
+## 常见问题
+- 端口占用：终端提示新的端口号，按提示访问即可。
+- 依赖安装失败：检查 Node 版本与网络，必要时切换镜像源。
+- 样式缺失：确认 Tailwind 依赖已安装，并检查 [src/styles](src/styles) 是否被正确引入。
 
-### 3. 页面组件 (components/pages/)
-每个页面组件都是独立的，便于单独开发和维护：
-- **HomePage.jsx**: 首页，包含快捷功能和系统概况
-- **HospitalsPage.jsx**: 医院列表页，支持筛选功能
-- **DoctorsPage.jsx**: 医生列表页，支持排行榜视图
-- **ConsultationPage.jsx**: 在线问诊页，包含聊天功能
-- **AppointmentsPage.jsx**: 预约管理页，支持签到和取消
-- **RecordsPage.jsx**: 就诊档案页，包含AI分析功能
+## 相关文档
+- 运行步骤与截图可参考 [运行说明.md](运行说明.md)
 
-### 4. 布局组件 (components/layout/)
-- **Navbar.jsx**: 顶部导航栏（桌面端）
-- **BottomNav.jsx**: 底部导航栏（移动端）
-
-### 5. 样式文件 (styles/)
-- **global.css**: 全局样式、动画效果、3D模型样式
-
-### 6. 主应用 (App.jsx)
-- 路由管理
-- 状态管理
-- 页面渲染
-
-## 开发规范
-
-### 导入规范
-```javascript
-// 1. React 相关
-import React, { useState } from 'react';
-
-// 2. 第三方库
-import { Icon } from 'lucide-react';
-
-// 3. 数据（推荐使用索引文件）
-import { MOCK_HOSPITALS, MOCK_DOCTORS } from '../../data';
-// 或直接导入
-import { MOCK_DATA } from '../../data/mockData';
-
-// 4. 组件（推荐使用索引文件）
-import { HomePage, HospitalsPage } from '../pages';
-import { Navbar, BottomNav } from '../layout';
-// 或直接导入
-import Component from '../path/to/Component';
-
-// 5. 样式
-import '../styles/global.css';
-```
-
-### 组件导出规范
-```javascript
-// 使用默认导出
-export default ComponentName;
-```
-
-### 命名规范
-- 组件文件：PascalCase (如 `HomePage.jsx`)
-- 数据文件：camelCase (如 `mockData.js`)
-- 样式文件：kebab-case (如 `global.css`)
-
-##  协同开发建议
-
-1. **数据层**: 由后端或数据团队维护 `mockData.js`
-2. **页面组件**: 每个开发者可以独立负责一个或多个页面组件
-3. **通用组件**: 由UI/UX团队统一维护
-4. **布局组件**: 由前端架构师维护
-5. **样式**: 统一使用 Tailwind CSS，全局样式在 `global.css` 中
-
-## 🚀 运行项目
-
-### 快速开始
-
-1. **安装依赖**
-   ```bash
-   npm install
-   ```
-
-2. **启动开发服务器**
-   ```bash
-   npm run dev
-   ```
-
-3. **查看效果**
-   - 浏览器会自动打开 `http://localhost:3000/`
-   - 如果没有自动打开，请手动访问该地址
-
-### 其他命令
-
-- `npm run build` - 构建生产版本
-- `npm run preview` - 预览生产版本
-
-> 📖 详细运行说明请查看 [运行说明.md](./运行说明.md)
-
-## 📦 使用方式
-
-### 基本使用
-在主入口文件中导入：
-```javascript
-import DentalApp from './App';
-```
-
-### 使用索引文件（推荐）
-```javascript
-// 导入页面组件
-import { HomePage, HospitalsPage } from './components/pages';
-
-// 导入布局组件
-import { Navbar, BottomNav } from './components/layout';
-
-// 导入数据
-import { MOCK_HOSPITALS, MOCK_DOCTORS } from './data';
-```
-
-## 📦 模块化优势
-
-1. **职责分离**: 每个模块只负责自己的功能
-2. **易于维护**: 修改某个页面不影响其他模块
-3. **便于测试**: 可以单独测试每个组件
-4. **团队协作**: 不同开发者可以同时开发不同模块
-5. **代码复用**: 通用组件可以在多个地方使用
-6. **清晰结构**: 文件组织清晰，易于查找和理解
-
-## 📝 注意事项
-
-- 所有组件使用函数式组件和 Hooks
-- 样式使用 Tailwind CSS 类名
-- 数据通过 props 传递，避免全局状态（当前版本）
-- 保持组件的单一职责原则
+> 如需与后端联调，请根据后端部署地址调整接口基础路径，或在 Vite 配置中添加代理。
 
