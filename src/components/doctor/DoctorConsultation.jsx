@@ -73,27 +73,32 @@ const DoctorConsultation = () => {
 
     // 获取患者姓名
     const getPatientName = (session) => {
-        // 优先使用 user_name 或 patient_name
-        if (session.user_name) return session.user_name;
-        if (session.patient_name) return session.patient_name;
+        const candidates = [
+            session?.user_name,
+            session?.patient_name,
+            session?.name,
+            session?.username,
+            session?.nickname,
+            session?.real_name,
+            session?.user?.name,
+            session?.user?.username,
+            session?.user?.nickname,
+            session?.user?.real_name,
+            session?.patient?.name,
+            session?.patient?.username,
+            session?.patient?.nickname,
+            session?.patient?.real_name,
+        ].filter(Boolean);
 
-        // 如果有 user 对象
-        if (session.user) {
-            if (session.user.name) return session.user.name;
-            if (session.user.phone) return `患者 ${session.user.phone.slice(-4)}`;
-        }
+        if (candidates.length > 0) return candidates[0];
 
-        // 如果有 patient 对象
-        if (session.patient) {
-            if (session.patient.name) return session.patient.name;
-            if (session.patient.phone) return `患者 ${session.patient.phone.slice(-4)}`;
-        }
+        // 如果只拿到电话，展示尾号以避免“患者”占位
+        if (session?.phone) return `患者 ${session.phone.slice(-4)}`;
+        if (session?.user_phone) return `患者 ${session.user_phone.slice(-4)}`;
+        if (session?.user?.phone) return `患者 ${session.user.phone.slice(-4)}`;
+        if (session?.patient?.phone) return `患者 ${session.patient.phone.slice(-4)}`;
 
-        // 最后尝试使用 phone 字段
-        if (session.phone) return `患者 ${session.phone.slice(-4)}`;
-        if (session.user_phone) return `患者 ${session.user_phone.slice(-4)}`;
-
-        return '患者';
+        return '未命名患者';
     };
 
     // 获取问诊会话列表
@@ -137,7 +142,9 @@ const DoctorConsultation = () => {
             console.log('问诊会话数据:', sessionData);
 
             if (sessionData && sessionData.id) {
-                setSelectedSession(sessionData);
+                const fallbackSession = sessions.find(s => s.id === sessionData.id) || selectedSession || {};
+                const mergedSession = { ...fallbackSession, ...sessionData };
+                setSelectedSession(mergedSession);
 
                 // 提取消息，兼容多种数据结构
                 let messages = [];
@@ -184,7 +191,8 @@ const DoctorConsultation = () => {
     useEffect(() => {
         if (!selectedSession?.id) return;
 
-        const POLL_MS = 2500;
+        // 1s 轮询，确保医生端及时看到患者新消息
+        const POLL_MS = 1000;
         let cancelled = false;
 
         const tick = async () => {
@@ -451,10 +459,6 @@ const DoctorConsultation = () => {
                             <div className="p-3 bg-white border-b border-slate-100 flex justify-between items-center flex-shrink-0">
                                 <div>
                                     <h3 className="font-bold text-slate-800">{getPatientName(selectedSession)}</h3>
-                                    <p className="text-sm text-slate-500 flex items-center gap-1 mt-0.5">
-                                        <Clock size={14} />
-                                        {selectedSession.created_at ? new Date(selectedSession.created_at).toLocaleString('zh-CN') : ''}
-                                    </p>
                                 </div>
                                 <button
                                     onClick={handleCloseSession}
